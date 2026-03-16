@@ -95,6 +95,61 @@ export default function Home() {
     go("subtopic");
   }
 
+  // --- Try bank first, fallback to AI generation ---
+  async function fetchFromBankOrAI(
+    endpoint: string,
+    aiBody: Record<string, unknown>,
+    bankParams: { textbook?: string; chapter?: string; section?: string; difficulty?: number; count: number },
+  ): Promise<QuizQuestion[] | null> {
+    // Try bank first if we have textbook params
+    if (bankParams.textbook && bankParams.chapter) {
+      try {
+        const params = new URLSearchParams({
+          textbook: bankParams.textbook,
+          chapter: bankParams.chapter,
+          count: String(bankParams.count),
+        });
+        if (bankParams.section) params.set("section", bankParams.section);
+        if (bankParams.difficulty) params.set("difficulty", String(bankParams.difficulty));
+        const res = await fetch(`/api/quiz/bank?${params}`);
+        const data = await res.json();
+        if (data.questions?.length >= bankParams.count) {
+          return data.questions;
+        }
+      } catch { /* fall through to AI */ }
+    }
+    // Fallback: AI generation
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(aiBody),
+      });
+      const data = await res.json();
+      return data.questions ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  // --- Map topic/subtopic to bank's chapter/section ---
+  function toBankParams(t: string, st: string) {
+    if (t === "数学" && grade === "中1") {
+      // Map GS subtopics to 体系数学1 chapters
+      const mapping: Record<string, { chapter: string; section?: string }> = {
+        "正負の数": { chapter: "正の数・負の数" },
+        "文字と式": { chapter: "文字と式" },
+        "一次方程式": { chapter: "一次方程式" },
+        "比例と反比例": { chapter: "比例と反比例" },
+        "平面図形": { chapter: "平面図形" },
+        "空間図形": { chapter: "空間図形" },
+      };
+      const found = mapping[st];
+      if (found) return { textbook: "体系数学1", ...found };
+    }
+    return { textbook: undefined, chapter: undefined };
+  }
+
   // --- Subtopic → Assessment ---
   async function onSubtopicSubmit() {
     const st = customSub.trim() || subtopic;
@@ -102,21 +157,17 @@ export default function Home() {
     setSubtopic(st);
     go("generating");
     setLoadMsg(randomMsg());
-    try {
-      const res = await fetch("/api/quiz/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, grade, topic, subtopic: st }),
-      });
-      const data = await res.json();
-      if (data.questions) {
-        setAQs(data.questions.slice(0, 5));
-        setAIdx(0); setAAns([]); setAScore(0);
-        go("assessment");
-      } else {
-        go("difficulty");
-      }
-    } catch {
+    const bank = toBankParams(topic, st);
+    const questions = await fetchFromBankOrAI(
+      "/api/quiz/generate",
+      { name, grade, topic, subtopic: st },
+      { ...bank, count: 5 },
+    );
+    if (questions && questions.length > 0) {
+      setAQs(questions.slice(0, 5));
+      setAIdx(0); setAAns([]); setAScore(0);
+      go("assessment");
+    } else {
       go("difficulty");
     }
   }
@@ -142,20 +193,16 @@ export default function Home() {
     const ctx = aQs.map((q, i) =>
       `問${i + 1}:${q.q}→${aAns[i]?.correct ? "⭕" : "❌"}`
     ).join("\n");
-    try {
-      const res = await fetch("/api/quiz/main", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, grade, topic, subtopic, difficulty: diff, assessScore: aScore, assessContext: ctx }),
-      });
-      const data = await res.json();
-      if (data.questions) {
-        setQQs(data.questions); setQIdx(0); setQAns([]); setQScore(0);
-        go("quiz");
-      } else {
-        setLoadMsg("生成失敗…もう一度お試しください");
-      }
-    } catch {
+    const bank = toBankParams(topic, subtopic);
+    const questions = await fetchFromBankOrAI(
+      "/api/quiz/main",
+      { name, grade, topic, subtopic, difficulty: diff, assessScore: aScore, assessContext: ctx },
+      { ...bank, difficulty: diff, count: 10 },
+    );
+    if (questions && questions.length > 0) {
+      setQQs(questions); setQIdx(0); setQAns([]); setQScore(0);
+      go("quiz");
+    } else {
       setLoadMsg("生成失敗…もう一度お試しください");
     }
   }

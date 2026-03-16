@@ -13,7 +13,13 @@ interface Props {
   finishLabel: string;
 }
 
+interface TutorMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 const LETTERS = ["A", "B", "C"];
+const MAX_TUTOR_TURNS = 3;
 
 export default function QuizInner({
   tag,
@@ -33,6 +39,14 @@ export default function QuizInner({
   const resultSent = useRef(false);
   const isLast = idx === total - 1;
 
+  // Tutor state
+  const [tutorOpen, setTutorOpen] = useState(false);
+  const [tutorMessages, setTutorMessages] = useState<TutorMessage[]>([]);
+  const [tutorInput, setTutorInput] = useState("");
+  const [tutorLoading, setTutorLoading] = useState(false);
+  const [tutorTurns, setTutorTurns] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const answered = selected !== null;
   const isCorrect = answered && selected === q.answer;
   const isSkipped = answered && selected === -1;
@@ -43,6 +57,11 @@ export default function QuizInner({
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
+
+  // Scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [tutorMessages]);
 
   const handleNext = useCallback(() => {
     onFinish(isLast ? "done" : "next");
@@ -65,20 +84,19 @@ export default function QuizInner({
       if (!isLast) {
         const delay = correct ? 1000 : 1800;
         timerRef.current = setTimeout(() => {
-          if (!explanationOpenRef.current) {
+          if (!explanationOpenRef.current && !tutorOpen) {
             handleNext();
           }
         }, delay);
       }
     },
-    [answered, q.answer, isLast, onResult, handleNext],
+    [answered, q.answer, isLast, onResult, handleNext, tutorOpen],
   );
 
   const toggleExplanation = () => {
     const next = !showExplanation;
     setShowExplanation(next);
     explanationOpenRef.current = next;
-    // Cancel auto-advance when explanation is opened
     if (next && timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -90,8 +108,117 @@ export default function QuizInner({
     setShowHint((v) => !v);
   };
 
+  // --- Tutor ---
+  const openTutor = () => {
+    setTutorOpen(true);
+    // Cancel auto-advance
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    // Send initial tutor request if no messages yet
+    if (tutorMessages.length === 0) {
+      sendTutorMessage(null);
+    }
+  };
+
+  const sendTutorMessage = async (userMessage: string | null) => {
+    if (tutorLoading) return;
+    if (tutorTurns >= MAX_TUTOR_TURNS && userMessage) return;
+
+    setTutorLoading(true);
+
+    // Add user message to history
+    const history = [...tutorMessages];
+    if (userMessage) {
+      const userMsg: TutorMessage = { role: "user", content: userMessage };
+      history.push(userMsg);
+      setTutorMessages((prev) => [...prev, userMsg]);
+      setTutorInput("");
+    }
+
+    try {
+      const studentAnswer =
+        selected === -1
+          ? "わからない"
+          : q.choices[selected ?? 0] ?? "未回答";
+      const correctAnswer = q.choices[q.answer] ?? "";
+
+      const res = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: q.q,
+          studentAnswer,
+          correctAnswer,
+          conversationHistory: history,
+        }),
+      });
+
+      if (!res.ok) throw new Error("tutor request failed");
+
+      // Read SSE stream
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("no reader");
+
+      const decoder = new TextDecoder();
+      let assistantText = "";
+
+      // Add placeholder assistant message
+      setTutorMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (data === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.text) {
+                assistantText += parsed.text;
+                // Update last assistant message
+                setTutorMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: "assistant",
+                    content: assistantText,
+                  };
+                  return updated;
+                });
+              }
+            } catch { /* skip malformed chunks */ }
+          }
+        }
+      }
+
+      if (userMessage) {
+        setTutorTurns((t) => t + 1);
+      }
+    } catch (err) {
+      console.error("tutor error:", err);
+      setTutorMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "ごめんなさい、エラーが発生しました。解説を見てみてね。" },
+      ]);
+    } finally {
+      setTutorLoading(false);
+    }
+  };
+
+  const handleTutorSubmit = () => {
+    const msg = tutorInput.trim();
+    if (!msg || tutorLoading) return;
+    sendTutorMessage(msg);
+  };
+
   // Need manual "next" button?
-  const showNextBtn = answered && (showExplanation || isLast);
+  const showNextBtn = answered && (showExplanation || isLast || tutorOpen);
 
   // Choice button style
   function choiceClass(i: number) {
@@ -203,7 +330,7 @@ export default function QuizInner({
         </div>
       )}
 
-      {/* After answer: feedback + explanation toggle */}
+      {/* After answer: feedback + explanation toggle + tutor */}
       {answered && (
         <div className="mt-3 space-y-3">
           {/* Result badge */}
@@ -217,17 +344,110 @@ export default function QuizInner({
             {isCorrect ? "✨ 正解！" : isSkipped ? "⏭ スキップ" : "😥 不正解…"}
           </div>
 
-          {/* Explanation toggle */}
-          <button
-            className="w-full text-sm text-center text-drd-purple-light hover:text-white transition-colors"
-            onClick={toggleExplanation}
-          >
-            📖 {showExplanation ? "解説をとじる" : "解説を見る"}
-          </button>
+          {/* Action buttons row */}
+          <div className="flex gap-2">
+            <button
+              className="flex-1 text-sm text-center py-2 rounded-lg text-drd-purple-light hover:bg-drd-purple/10 transition-colors"
+              onClick={toggleExplanation}
+            >
+              📖 {showExplanation ? "解説をとじる" : "解説を見る"}
+            </button>
+
+            {/* Tutor button - only show on incorrect/skipped */}
+            {!isCorrect && !tutorOpen && (
+              <button
+                className="flex-1 text-sm text-center py-2 rounded-lg text-drd-teal hover:bg-drd-teal/10 transition-colors"
+                onClick={openTutor}
+              >
+                🧠 一緒に考える
+              </button>
+            )}
+          </div>
 
           {showExplanation && (
             <div className="animate-fade-in bg-drd-purple/10 border border-drd-purple/30 rounded-xl px-4 py-3 text-sm leading-relaxed text-[#c9d1d9]">
               {q.explanation}
+            </div>
+          )}
+
+          {/* Tutor Chat UI */}
+          {tutorOpen && (
+            <div className="animate-fade-in border border-drd-teal/30 rounded-xl overflow-hidden">
+              {/* Chat header */}
+              <div className="bg-drd-teal/10 px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🧬</span>
+                  <span className="text-sm font-bold text-drd-teal">Dr.D と一緒に考えよう</span>
+                </div>
+                <span className="text-xs text-[#8b949e]">
+                  {tutorTurns}/{MAX_TUTOR_TURNS}回
+                </span>
+              </div>
+
+              {/* Chat messages */}
+              <div className="max-h-60 overflow-y-auto px-4 py-3 space-y-3 bg-drd-bg/50">
+                {tutorMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    {msg.role === "assistant" && (
+                      <span className="text-lg shrink-0 mt-0.5">🧬</span>
+                    )}
+                    <div
+                      className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                        msg.role === "user"
+                          ? "bg-drd-amber/15 text-[#e6edf3] rounded-br-none"
+                          : "bg-drd-bg2 border border-[#30363d] text-[#c9d1d9] rounded-bl-none"
+                      }`}
+                    >
+                      {msg.content || (
+                        <span className="inline-flex gap-1">
+                          <span className="w-1.5 h-1.5 bg-[#8b949e] rounded-full animate-bounce" />
+                          <span className="w-1.5 h-1.5 bg-[#8b949e] rounded-full animate-bounce [animation-delay:0.15s]" />
+                          <span className="w-1.5 h-1.5 bg-[#8b949e] rounded-full animate-bounce [animation-delay:0.3s]" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat input */}
+              {tutorTurns < MAX_TUTOR_TURNS ? (
+                <div className="flex gap-2 px-3 py-2 border-t border-[#30363d] bg-drd-bg2">
+                  <input
+                    className="flex-1 bg-drd-bg border border-[#30363d] rounded-lg px-3 py-2 text-sm outline-none focus:border-drd-teal transition-colors placeholder:text-[#484f58]"
+                    value={tutorInput}
+                    onChange={(e) => setTutorInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleTutorSubmit(); }}
+                    placeholder="考えたことを入力してね..."
+                    disabled={tutorLoading}
+                  />
+                  <button
+                    className="bg-drd-teal hover:bg-drd-teal/80 disabled:opacity-40 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors"
+                    onClick={handleTutorSubmit}
+                    disabled={!tutorInput.trim() || tutorLoading}
+                  >
+                    送信
+                  </button>
+                </div>
+              ) : (
+                <div className="px-4 py-3 border-t border-[#30363d] bg-drd-bg2 text-center">
+                  <p className="text-xs text-[#8b949e] mb-2">
+                    会話の上限に達しました。解説を確認してみよう！
+                  </p>
+                  {!showExplanation && (
+                    <button
+                      className="text-sm text-drd-purple-light hover:text-white transition-colors"
+                      onClick={toggleExplanation}
+                    >
+                      📖 解説を見る
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
