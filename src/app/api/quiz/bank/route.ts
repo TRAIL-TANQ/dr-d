@@ -25,12 +25,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "textbook and chapter are required" }, { status: 400 });
     }
 
-    // Build query
+    // Build query (exclude flagged questions)
     let query = supabase
       .from("questions")
       .select("id, q, choices, answer, hint, explanation, difficulty, times_used")
       .eq("textbook", textbook)
       .eq("chapter", chapter)
+      .eq("is_flagged", false)
       .order("times_used", { ascending: true })
       .limit(count * 3); // fetch extra for randomization
 

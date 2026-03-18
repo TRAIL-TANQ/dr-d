@@ -62,7 +62,9 @@ export default function QuizInner({
   const [reportType, setReportType] = useState<string>("");
   const [reportComment, setReportComment] = useState("");
   const [reportSending, setReportSending] = useState(false);
-  const [reportDone, setReportDone] = useState(false);
+  const [reportResult, setReportResult] = useState<{ confirmed: boolean; xp: number; reason: string; locked?: boolean } | null>(null);
+  const [rejectedCount, setRejectedCount] = useState(0);
+  const reportLocked = rejectedCount >= 3;
 
   const answered = selected !== null;
   const isCorrect = answered && selected === q.answer;
@@ -205,7 +207,7 @@ export default function QuizInner({
 
   // --- Report ---
   const handleReport = async () => {
-    if (!reportType || reportSending || !q.id) return;
+    if (!reportType || reportSending || !q.id || reportLocked) return;
     setReportSending(true);
     try {
       const res = await fetch("/api/quiz/report", {
@@ -219,13 +221,20 @@ export default function QuizInner({
         }),
       });
       const data = await res.json();
-      if (res.ok || data.duplicate) {
-        setReportDone(true);
-        setTimeout(() => { setReportOpen(false); }, 2000);
+      if (data.locked) {
+        setRejectedCount(3);
+        setReportResult({ confirmed: false, xp: 0, reason: data.message, locked: true });
+      } else {
+        setReportResult({ confirmed: data.confirmed, xp: data.xp ?? 0, reason: data.reason ?? "" });
+        if (!data.confirmed && !data.duplicate) {
+          setRejectedCount((c) => c + 1);
+        }
       }
     } catch { /* ignore */ }
     finally { setReportSending(false); }
   };
+
+  const reportDone = reportResult !== null;
 
   // Choice button style
   function choiceClass(i: number) {
@@ -314,13 +323,17 @@ export default function QuizInner({
             >
               🤷 わからない
             </button>
-            {q.id ? (
+            {q.id && !reportLocked ? (
               <button
                 className={ACTION_BTN + " text-[#8C7B6B]"}
                 onClick={() => setReportOpen(true)}
               >
-                🚩 この問題おかしい
+                🚩 報告 <span className="text-[10px] text-[#BDB0A3]">残り{3 - rejectedCount}回</span>
               </button>
+            ) : q.id ? (
+              <div className={ACTION_BTN + " text-[#BDB0A3] cursor-default opacity-60"}>
+                🔒 報告上限
+              </div>
             ) : (
               <div />
             )}
@@ -368,13 +381,13 @@ export default function QuizInner({
               <button className={ACTION_BTN + " text-drd-teal"} onClick={openTutor}>
                 🧠 一緒に考える
               </button>
-              {q.id && !reportDone ? (
+              {q.id && !reportDone && !reportLocked ? (
                 <button className={ACTION_BTN + " text-[#8C7B6B]"} onClick={() => setReportOpen(true)}>
-                  🚩 この問題おかしい
+                  🚩 報告 <span className="text-[10px] text-[#BDB0A3]">残り{3 - rejectedCount}回</span>
                 </button>
               ) : (
-                <div className={ACTION_BTN + " text-drd-teal opacity-60 cursor-default"}>
-                  {reportDone ? "✅ 報告済み" : "🚩 報告不可"}
+                <div className={ACTION_BTN + " opacity-60 cursor-default " + (reportDone && reportResult?.confirmed ? "text-drd-teal" : "text-[#BDB0A3]")}>
+                  {reportLocked ? "🔒 報告上限" : reportResult?.confirmed ? "✅ バグ確認済み" : reportDone ? "✅ 報告済み" : "🚩 報告不可"}
                 </div>
               )}
               <button className={ACTION_BTN + " bg-drd-amber text-white border-drd-amber hover:bg-drd-amber/90"} onClick={handleNext}>
@@ -383,53 +396,93 @@ export default function QuizInner({
             </div>
           )}
 
-          {/* Report toast */}
-          {reportDone && reportOpen && (
-            <div className="animate-fade-in text-sm text-drd-teal text-center py-2 bg-drd-teal/10 rounded-lg">
-              ありがとう！確認後にXPがもらえるよ 🎁
+          {/* Report result */}
+          {reportResult && !reportOpen && (
+            <div className={`animate-fade-in text-sm text-center py-2 rounded-lg font-semibold ${
+              reportResult.confirmed
+                ? "bg-drd-teal/15 text-drd-teal"
+                : "bg-[#E8DDD0]/50 text-[#8C7B6B]"
+            }`}>
+              {reportResult.locked
+                ? "🔒 今日の報告上限に達しました"
+                : reportResult.confirmed
+                  ? `🎉 バグ発見！+${reportResult.xp} XP！`
+                  : "確認ありがとう。この問題は正しいようです 👍"}
             </div>
           )}
 
           {/* Report modal */}
-          {reportOpen && !reportDone && (
+          {reportOpen && (
             <div className="animate-fade-in bg-white border border-[#E8DDD0] rounded-xl p-4 space-y-3">
-              <h4 className="text-sm font-bold">🚩 問題を報告</h4>
-              <div className="flex flex-col gap-1.5">
-                {REPORT_TYPES.map((rt) => (
-                  <label key={rt.value} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="reportType"
-                      value={rt.value}
-                      checked={reportType === rt.value}
-                      onChange={() => setReportType(rt.value)}
-                      className="accent-drd-amber"
-                    />
-                    {rt.label}
-                  </label>
-                ))}
-              </div>
-              <input
-                className="w-full bg-drd-bg border border-[#E8DDD0] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#BDB0A3]"
-                value={reportComment}
-                onChange={(e) => setReportComment(e.target.value)}
-                placeholder="詳細（任意）"
-              />
-              <div className="flex gap-3">
-                <button
-                  className="flex-1 bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
-                  onClick={handleReport}
-                  disabled={!reportType || reportSending}
-                >
-                  {reportSending ? "送信中..." : "報告する"}
-                </button>
-                <button
-                  className="px-4 py-2.5 rounded-xl text-sm text-[#8C7B6B] hover:bg-drd-bg3 transition-colors border border-[#E8DDD0]"
-                  onClick={() => setReportOpen(false)}
-                >
-                  やめる
-                </button>
-              </div>
+              {reportSending ? (
+                <div className="flex flex-col items-center py-6 gap-3">
+                  <div className="w-8 h-8 border-3 border-drd-amber/30 border-t-drd-amber rounded-full animate-spin" />
+                  <p className="text-sm text-[#8C7B6B]">Dr.Dが検証中... 🔍</p>
+                </div>
+              ) : reportResult ? (
+                <div className="py-4 space-y-3">
+                  <div className={`text-center text-base font-bold py-3 rounded-xl ${
+                    reportResult.confirmed
+                      ? "bg-drd-teal/15 text-drd-teal"
+                      : "bg-[#E8DDD0]/50 text-[#8C7B6B]"
+                  }`}>
+                    {reportResult.locked
+                      ? "🔒 今日の報告上限に達しました"
+                      : reportResult.confirmed
+                        ? `🎉 バグ発見！+${reportResult.xp} XP！`
+                        : "確認ありがとう。この問題は正しいようです 👍"}
+                  </div>
+                  {reportResult.reason && !reportResult.locked && (
+                    <p className="text-xs text-[#8C7B6B] text-center">{reportResult.reason}</p>
+                  )}
+                  <button
+                    className="w-full bg-drd-amber hover:bg-drd-amber/90 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
+                    onClick={() => setReportOpen(false)}
+                  >
+                    OK
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h4 className="text-sm font-bold">🚩 問題を報告</h4>
+                  <div className="flex flex-col gap-1.5">
+                    {REPORT_TYPES.map((rt) => (
+                      <label key={rt.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="reportType"
+                          value={rt.value}
+                          checked={reportType === rt.value}
+                          onChange={() => setReportType(rt.value)}
+                          className="accent-drd-amber"
+                        />
+                        {rt.label}
+                      </label>
+                    ))}
+                  </div>
+                  <input
+                    className="w-full bg-drd-bg border border-[#E8DDD0] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#BDB0A3]"
+                    value={reportComment}
+                    onChange={(e) => setReportComment(e.target.value)}
+                    placeholder="詳細（任意）"
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      className="flex-1 bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
+                      onClick={handleReport}
+                      disabled={!reportType || reportSending}
+                    >
+                      報告する
+                    </button>
+                    <button
+                      className="px-4 py-2.5 rounded-xl text-sm text-[#8C7B6B] hover:bg-drd-bg3 transition-colors border border-[#E8DDD0]"
+                      onClick={() => setReportOpen(false)}
+                    >
+                      やめる
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
