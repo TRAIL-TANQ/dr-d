@@ -52,7 +52,7 @@ export default function Home() {
     case "seat":
       return <SeatScreen />;
     case "timer":
-      return <TimerScreen />;
+      return <TimerScreen liffProfile={liffProfile} />;
     case "report":
       return <ReportScreen />;
     case "settings":
