@@ -14,7 +14,7 @@ export default function ProgressDots({ phases, current }: Props) {
           className={`rounded-full transition-all duration-300 ${
             i <= current
               ? "w-2.5 h-2.5 bg-drd-amber"
-              : "w-2 h-2 bg-white/10"
+              : "w-2 h-2 bg-[#E8DDD0]"
           } ${i === current ? "scale-140" : ""}`}
         >
           {i <= current && (

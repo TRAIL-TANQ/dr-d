@@ -1,10 +1,19 @@
-export const GRADES = ["中1", "中2", "中3", "高1", "高2", "高3"] as const;
+export const GRADES = ["小4", "小5", "小6", "中1", "中2", "中3", "高1", "高2", "高3"] as const;
 export type Grade = (typeof GRADES)[number];
 
 export const GS: Record<
   Grade,
   { icon: string; subject: string; desc: string; subs: string[] }[]
 > = {
+  "小4": [
+    { icon: "🔢", subject: "算数", desc: "大きな数・わり算・角と図形・小数・分数", subs: ["大きな数", "わり算", "角と図形", "小数", "分数", "面積", "がい数", "変わり方とグラフ"] },
+  ],
+  "小5": [
+    { icon: "🔢", subject: "算数", desc: "小数のかけ算わり算・分数・割合・体積", subs: ["整数と小数", "小数のかけ算・わり算", "分数", "図形の面積", "体積", "割合", "平均と単位量あたり", "合同と角"] },
+  ],
+  "小6": [
+    { icon: "🔢", subject: "算数", desc: "分数のかけ算わり算・比・速さ・比例", subs: ["分数のかけ算・わり算", "比と比の値", "円の面積", "対称な図形", "拡大と縮小", "速さ", "比例と反比例", "データの調べ方"] },
+  ],
   "中1": [
     { icon: "📐", subject: "数学", desc: "正負の数・文字式・方程式・比例", subs: ["正負の数", "文字と式", "一次方程式", "比例と反比例", "平面図形", "空間図形"] },
     { icon: "🔬", subject: "理科", desc: "植物・光と音・力・状態変化", subs: ["植物のつくり", "光の性質", "音の性質", "力のはたらき", "物質の状態変化", "水溶液"] },
@@ -59,7 +68,10 @@ export const XP_S = 30;
 /** XP: 経過観察（最終確認）正答 */
 export const XP_F = 20;
 
-export const LEVELS = [0, 100, 250, 500, 850, 1300, 1900, 2600, 3500, 4600, 6000];
+export const LEVELS = [
+  0, 100, 250, 500, 850, 1300, 1900, 2600, 3500, 4600,
+  6000, 7600, 9400, 11500, 14000, 17000, 20500, 24500, 29000, 34000,
+];
 
 export function getLevel(xp: number): { level: number; cur: number; next: number } {
   for (let i = LEVELS.length - 1; i >= 0; i--) {
@@ -67,9 +79,28 @@ export function getLevel(xp: number): { level: number; cur: number; next: number
       return {
         level: i + 1,
         cur: xp - LEVELS[i],
-        next: (LEVELS[i + 1] ?? LEVELS[i] + 2000) - LEVELS[i],
+        next: (LEVELS[i + 1] ?? LEVELS[i] + 5000) - LEVELS[i],
       };
     }
   }
   return { level: 1, cur: 0, next: 100 };
+}
+
+const TITLES: [number, string][] = [
+  [20, "👑 Professor"],
+  [17, "⭐ Postdoc Fellow"],
+  [14, "🎖️ Doctor"],
+  [11, "🏅 Ph.D. Candidate"],
+  [8, "📜 Master"],
+  [6, "🎓 Bachelor"],
+  [4, "📋 Research Assistant"],
+  [2, "🔬 ラボ配属生"],
+  [1, "🧪 ラボ見学生"],
+];
+
+export function getTitleForLevel(level: number): string {
+  for (const [minLv, title] of TITLES) {
+    if (level >= minLv) return title;
+  }
+  return "🧪 ラボ見学生";
 }

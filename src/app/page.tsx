@@ -6,7 +6,7 @@ import ProgressDots from "@/components/ProgressDots";
 import HistoryPanel from "@/components/HistoryPanel";
 import TypeWriter from "@/components/TypeWriter";
 import QuizInner from "@/components/QuizInner";
-import { GRADES, GS, XP_C, XP_S, XP_F, getLevel } from "@/lib/constants";
+import { GRADES, GS, XP_C, XP_S, XP_F, getLevel, getTitleForLevel } from "@/lib/constants";
 import type { Grade } from "@/lib/constants";
 import type { QuizQuestion, SessionResult, Profile, HistoryEntry, Report } from "@/lib/types";
 
@@ -132,20 +132,84 @@ export default function Home() {
     }
   }
 
-  // --- Map topic/subtopic to bank's chapter/section ---
+  // --- Map topic/subtopic to bank's textbook/chapter/section ---
   function toBankParams(t: string, st: string) {
-    if (t === "数学" && grade === "中1") {
-      // Map GS subtopics to 体系数学1 chapters
-      const mapping: Record<string, { chapter: string; section?: string }> = {
-        "正負の数": { chapter: "正の数・負の数" },
-        "文字と式": { chapter: "文字と式" },
-        "一次方程式": { chapter: "一次方程式" },
-        "比例と反比例": { chapter: "比例と反比例" },
-        "平面図形": { chapter: "平面図形" },
-        "空間図形": { chapter: "空間図形" },
-      };
-      const found = mapping[st];
-      if (found) return { textbook: "体系数学1", ...found };
+    type BankMapping = Record<string, { chapter: string; section?: string }>;
+    interface TextbookConfig { textbook: string; mapping: BankMapping }
+
+    // Grade + subject → textbook config
+    const configs: Record<string, TextbookConfig | undefined> = {
+      // 小学算数
+      "小4:算数": { textbook: "小学算数4年", mapping: {
+        "大きな数": { chapter: "大きな数" }, "わり算": { chapter: "わり算" },
+        "角と図形": { chapter: "角と図形" }, "小数": { chapter: "小数" },
+        "分数": { chapter: "分数" }, "面積": { chapter: "面積" },
+        "がい数": { chapter: "がい数" }, "変わり方とグラフ": { chapter: "変わり方とグラフ" },
+      }},
+      "小5:算数": { textbook: "小学算数5年", mapping: {
+        "整数と小数": { chapter: "整数と小数" }, "小数のかけ算・わり算": { chapter: "小数のかけ算・わり算" },
+        "分数": { chapter: "分数" }, "図形の面積": { chapter: "図形の面積" },
+        "体積": { chapter: "体積" }, "割合": { chapter: "割合" },
+        "平均と単位量あたり": { chapter: "平均と単位量あたり" }, "合同と角": { chapter: "合同と角" },
+      }},
+      "小6:算数": { textbook: "小学算数6年", mapping: {
+        "分数のかけ算・わり算": { chapter: "分数のかけ算・わり算" }, "比と比の値": { chapter: "比と比の値" },
+        "円の面積": { chapter: "円の面積" }, "対称な図形": { chapter: "対称な図形" },
+        "拡大と縮小": { chapter: "拡大と縮小" }, "速さ": { chapter: "速さ" },
+        "比例と反比例": { chapter: "比例と反比例" }, "データの調べ方": { chapter: "データの調べ方" },
+      }},
+      // 中学数学
+      "中1:数学": { textbook: "体系数学1", mapping: {
+        "正負の数": { chapter: "正の数・負の数" }, "文字と式": { chapter: "文字と式" },
+        "一次方程式": { chapter: "一次方程式" }, "比例と反比例": { chapter: "比例と反比例" },
+        "平面図形": { chapter: "平面図形" }, "空間図形": { chapter: "空間図形" },
+      }},
+      "中2:数学": { textbook: "体系数学2", mapping: {
+        "式の計算": { chapter: "式の計算" }, "連立方程式": { chapter: "連立方程式" },
+        "一次関数": { chapter: "一次関数" }, "三角形の合同": { chapter: "平行と合同" },
+        "四角形": { chapter: "三角形と四角形" }, "確率": { chapter: "確率" },
+      }},
+      // 中学英語
+      "中1:英語": { textbook: "NEW CROWN 1", mapping: {
+        "be動詞": { chapter: "be動詞" }, "一般動詞": { chapter: "一般動詞" },
+        "疑問詞": { chapter: "疑問詞" }, "名詞の複数形": { chapter: "名詞・代名詞", section: "複数形" },
+        "代名詞": { chapter: "名詞・代名詞", section: "人称代名詞" },
+        "canの使い方": { chapter: "canの文" },
+      }},
+      // 中学理科
+      "中1:理科": { textbook: "中学理科1", mapping: {
+        "植物のつくり": { chapter: "植物の世界" }, "光の性質": { chapter: "光・音・力", section: "光の反射と屈折" },
+        "音の性質": { chapter: "光・音・力", section: "音の性質" },
+        "力のはたらき": { chapter: "光・音・力", section: "力のはたらき" },
+        "物質の状態変化": { chapter: "物質の性質", section: "物質の状態変化" },
+        "水溶液": { chapter: "物質の性質", section: "水溶液の性質" },
+      }},
+      "中2:理科": { textbook: "中学理科2", mapping: {
+        "電流と回路": { chapter: "電流とその利用", section: "回路と電流・電圧" },
+        "電流と磁界": { chapter: "電流とその利用", section: "電流と磁界" },
+        "化学変化": { chapter: "化学変化と原子・分子", section: "物質の分解" },
+        "酸化と還元": { chapter: "化学変化と原子・分子", section: "酸化と還元" },
+        "動物のからだ": { chapter: "動物の世界" },
+        "天気の変化": { chapter: "天気の変化" },
+      }},
+      // 中学社会
+      "中1:社会": { textbook: "中学地理", mapping: {
+        "世界の地理": { chapter: "世界の姿" }, "古代文明": { chapter: "世界の諸地域" },
+        "地図の読み方": { chapter: "世界の姿", section: "地図の見方" },
+      }},
+      "中2:社会": { textbook: "中学歴史", mapping: {
+        "鎌倉時代": { chapter: "中世", section: "鎌倉幕府" },
+        "室町時代": { chapter: "中世", section: "室町幕府" },
+        "安土桃山時代": { chapter: "近世", section: "織田信長・豊臣秀吉" },
+        "江戸時代": { chapter: "近世", section: "江戸幕府の成立" },
+      }},
+    };
+
+    const key = `${grade}:${t}`;
+    const cfg = configs[key];
+    if (cfg) {
+      const found = cfg.mapping[st];
+      if (found) return { textbook: cfg.textbook, ...found };
     }
     return { textbook: undefined, chapter: undefined };
   }
@@ -315,21 +379,21 @@ export default function Home() {
       >
         {/* ===== Welcome ===== */}
         {phase === "welcome" && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6 sm:p-8">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6 sm:p-8">
             <div className="text-center text-6xl mb-2">🧬</div>
             <h1 className="text-center text-3xl font-bold bg-gradient-to-r from-drd-amber to-[#e8c468] bg-clip-text text-transparent mb-1">
               Dr.D
             </h1>
-            <p className="text-center text-[#8b949e] text-sm mb-6">きみの学びを、診断しよう。</p>
+            <p className="text-center text-[#8C7B6B] text-sm mb-6">きみの学びを、診断しよう。</p>
 
-            <div className="bg-drd-bg3 rounded-xl px-4 py-3 text-sm text-[#8b949e] text-center mb-6">
+            <div className="bg-drd-bg3 rounded-xl px-4 py-3 text-sm text-[#8C7B6B] text-center mb-6">
               科目をえらんで → 理解度チェック → 診断クイズ → 学習プラン処方！
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-[#8b949e] mb-1.5">なまえを教えてね</label>
+              <label className="block text-sm font-semibold text-[#8C7B6B] mb-1.5">なまえを教えてね</label>
               <input
-                className="w-full bg-drd-bg border border-[#30363d] rounded-xl px-4 py-3 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#484f58]"
+                className="w-full bg-drd-bg border border-[#E8DDD0] rounded-xl px-4 py-3 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#BDB0A3]"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="ニックネームでもOK"
@@ -338,16 +402,16 @@ export default function Home() {
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-semibold text-[#8b949e] mb-1.5">学年をえらんでね</label>
-              <div className="grid grid-cols-6 gap-2">
+              <label className="block text-sm font-semibold text-[#8C7B6B] mb-1.5">学年をえらんでね</label>
+              <div className="grid grid-cols-3 gap-2">
                 {GRADES.map((g) => (
                   <button
                     key={g}
                     onClick={() => setGrade(g)}
                     className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
                       grade === g
-                        ? "bg-drd-amber text-drd-bg"
-                        : "bg-drd-bg border border-[#30363d] text-[#8b949e] hover:border-drd-amber/50"
+                        ? "bg-drd-amber text-white"
+                        : "bg-drd-bg border border-[#E8DDD0] text-[#8C7B6B] hover:border-drd-amber/50"
                     }`}
                   >
                     {g}
@@ -357,7 +421,7 @@ export default function Home() {
             </div>
 
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 disabled:cursor-not-allowed text-drd-bg font-bold py-3.5 rounded-xl transition-colors text-base"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors text-base"
               onClick={onWelcome}
               disabled={!name.trim() || !grade}
             >
@@ -368,7 +432,7 @@ export default function Home() {
 
         {/* ===== Topic ===== */}
         {phase === "topic" && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="flex items-start gap-3 mb-5">
               <span className="text-3xl">🧬</span>
               <div className="bg-drd-bg3 rounded-xl rounded-tl-none px-4 py-3 text-sm">
@@ -377,7 +441,7 @@ export default function Home() {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-[#8b949e] mb-2">📚 {grade}の科目からえらぶ</label>
+              <label className="block text-sm font-semibold text-[#8C7B6B] mb-2">📚 {grade}の科目からえらぶ</label>
               <div className="grid grid-cols-2 gap-2">
                 {subs.map((s, i) => (
                   <button
@@ -386,23 +450,23 @@ export default function Home() {
                     className={`text-left rounded-xl p-3 border transition-all ${
                       topic === s.subject && !custom
                         ? "bg-drd-amber/15 border-drd-amber"
-                        : "bg-drd-bg border-[#30363d] hover:border-drd-amber/40"
+                        : "bg-drd-bg border-[#E8DDD0] hover:border-drd-amber/40"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xl">{s.icon}</span>
                       <span className="font-bold text-sm">{s.subject}</span>
                     </div>
-                    <p className="text-xs text-[#8b949e] leading-relaxed">{s.desc}</p>
+                    <p className="text-xs text-[#8C7B6B] leading-relaxed">{s.desc}</p>
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-[#8b949e] mb-1.5">✏️ 自分で入力してもOK</label>
+              <label className="block text-sm font-semibold text-[#8C7B6B] mb-1.5">✏️ 自分で入力してもOK</label>
               <input
-                className="w-full bg-drd-bg border border-[#30363d] rounded-xl px-4 py-3 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#484f58]"
+                className="w-full bg-drd-bg border border-[#E8DDD0] rounded-xl px-4 py-3 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#BDB0A3]"
                 value={custom}
                 onChange={(e) => { setCustom(e.target.value); if (e.target.value) setTopic(""); }}
                 onKeyDown={(e) => { if (e.key === "Enter") onTopicSubmit(); }}
@@ -411,7 +475,7 @@ export default function Home() {
             </div>
 
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 disabled:cursor-not-allowed text-drd-bg font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors"
               onClick={onTopicSubmit}
               disabled={!topic && !custom.trim()}
             >
@@ -422,7 +486,7 @@ export default function Home() {
 
         {/* ===== Subtopic ===== */}
         {phase === "subtopic" && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="flex items-start gap-3 mb-5">
               <span className="text-3xl">🧬</span>
               <div className="bg-drd-bg3 rounded-xl rounded-tl-none px-4 py-3 text-sm">
@@ -432,7 +496,7 @@ export default function Home() {
 
             {subChoices.length > 0 && (
               <div className="mb-4">
-                <label className="block text-sm font-semibold text-[#8b949e] mb-2">📎 {topic}の範囲からえらぶ</label>
+                <label className="block text-sm font-semibold text-[#8C7B6B] mb-2">📎 {topic}の範囲からえらぶ</label>
                 <div className="flex flex-wrap gap-2">
                   {subChoices.map((sc, i) => (
                     <button
@@ -441,7 +505,7 @@ export default function Home() {
                       className={`px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${
                         subtopic === sc && !customSub
                           ? "bg-drd-amber/15 border-drd-amber text-drd-amber"
-                          : "bg-drd-bg border-[#30363d] text-[#8b949e] hover:border-drd-amber/40"
+                          : "bg-drd-bg border-[#E8DDD0] text-[#8C7B6B] hover:border-drd-amber/40"
                       }`}
                     >
                       {sc}
@@ -452,9 +516,9 @@ export default function Home() {
             )}
 
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-[#8b949e] mb-1.5">✏️ 自分で範囲を入力してもOK</label>
+              <label className="block text-sm font-semibold text-[#8C7B6B] mb-1.5">✏️ 自分で範囲を入力してもOK</label>
               <input
-                className="w-full bg-drd-bg border border-[#30363d] rounded-xl px-4 py-3 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#484f58]"
+                className="w-full bg-drd-bg border border-[#E8DDD0] rounded-xl px-4 py-3 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#BDB0A3]"
                 value={customSub}
                 onChange={(e) => { setCustomSub(e.target.value); if (e.target.value) setSubtopic(""); }}
                 onKeyDown={(e) => { if (e.key === "Enter") onSubtopicSubmit(); }}
@@ -463,7 +527,7 @@ export default function Home() {
             </div>
 
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 disabled:cursor-not-allowed text-drd-bg font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors"
               onClick={onSubtopicSubmit}
               disabled={!subtopic && !customSub.trim()}
             >
@@ -474,10 +538,10 @@ export default function Home() {
 
         {/* ===== Generating / Loading ===== */}
         {(phase === "generating" || phase === "generating2" || phase === "scoring") && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="flex flex-col items-center py-10 gap-4">
               <div className="w-10 h-10 border-3 border-drd-amber/30 border-t-drd-amber rounded-full animate-spin" />
-              <p className="text-sm text-[#8b949e]">{loadMsg}</p>
+              <p className="text-sm text-[#8C7B6B]">{loadMsg}</p>
             </div>
           </div>
         )}
@@ -498,7 +562,7 @@ export default function Home() {
 
         {/* ===== Difficulty ===== */}
         {phase === "difficulty" && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="flex items-start gap-3 mb-5">
               <span className="text-3xl">🧬</span>
               <div className="bg-drd-bg3 rounded-xl rounded-tl-none px-4 py-3 text-sm">
@@ -510,11 +574,11 @@ export default function Home() {
 
             <div className="text-center mb-5">
               <span className="text-5xl font-bold">{aScore}</span>
-              <span className="text-xl text-[#8b949e]">/{aQs.length}</span>
+              <span className="text-xl text-[#8C7B6B]">/{aQs.length}</span>
             </div>
 
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-[#8b949e] mb-2">
+              <label className="block text-sm font-semibold text-[#8C7B6B] mb-2">
                 🎯 Dr.Dのおすすめ → <strong className="text-drd-amber">Lv.{sugDiff}</strong>　変えてもOK！
               </label>
               <div className="grid grid-cols-5 gap-2">
@@ -525,11 +589,11 @@ export default function Home() {
                     className={`flex flex-col items-center py-3 rounded-xl border transition-all text-center ${
                       diff === lv
                         ? "bg-drd-amber/15 border-drd-amber"
-                        : "bg-drd-bg border-[#30363d] hover:border-drd-amber/40"
+                        : "bg-drd-bg border-[#E8DDD0] hover:border-drd-amber/40"
                     } ${sugDiff === lv ? "ring-2 ring-drd-amber/50" : ""}`}
                   >
                     <span className="text-lg font-bold">{lv}</span>
-                    <span className="text-[10px] text-[#8b949e]">
+                    <span className="text-[10px] text-[#8C7B6B]">
                       {["かんたん", "ふつう", "ちょいムズ", "むずかしい", "超ムズ"][lv - 1]}
                     </span>
                     <span className="text-[10px] mt-0.5">{"★".repeat(lv) + "☆".repeat(5 - lv)}</span>
@@ -542,7 +606,7 @@ export default function Home() {
             </div>
 
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-drd-bg font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-white font-bold py-3.5 rounded-xl transition-colors"
               onClick={onStartQuiz}
             >
               この難易度で診断スタート！ →
@@ -566,7 +630,7 @@ export default function Home() {
 
         {/* ===== Results / Prescription ===== */}
         {phase === "results" && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="text-center text-xs font-bold text-drd-amber bg-drd-amber/10 rounded-lg py-1.5 mb-5">
               💊 処方箋
             </div>
@@ -574,7 +638,7 @@ export default function Home() {
             <div className="flex justify-center mb-6">
               <div className="relative">
                 <svg viewBox="0 0 120 120" className="w-28 h-28">
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth="8" />
                   <circle
                     cx="60" cy="60" r="52" fill="none"
                     stroke={qScore >= 7 ? "#2ec4b2" : qScore >= 4 ? "#f4a261" : "#e76f51"}
@@ -587,7 +651,7 @@ export default function Home() {
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-4xl font-bold">{qScore}</span>
-                  <span className="text-base text-[#8b949e]">/10</span>
+                  <span className="text-base text-[#8C7B6B]">/10</span>
                 </div>
               </div>
             </div>
@@ -595,12 +659,12 @@ export default function Home() {
               {qScore >= 8 ? "すばらしい！🌟" : qScore >= 5 ? "いい感じ！💪" : "のびしろいっぱい！🌱"}
             </p>
 
-            <div className="bg-drd-bg rounded-xl border border-[#30363d] px-4 py-4 mb-5">
+            <div className="bg-drd-bg rounded-xl border border-[#E8DDD0] px-4 py-4 mb-5">
               {plan.split("\n").filter(Boolean).map((l, i) => (
                 <p
                   key={i}
                   className={`text-sm leading-relaxed mb-2 ${
-                    l.startsWith("📌") ? "text-drd-amber font-medium" : "text-[#8b949e]"
+                    l.startsWith("📌") ? "text-drd-amber font-medium" : "text-[#8C7B6B]"
                   }`}
                 >
                   {l}
@@ -609,7 +673,7 @@ export default function Home() {
             </div>
 
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-drd-bg font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-white font-bold py-3.5 rounded-xl transition-colors"
               onClick={startFinal}
             >
               経過観察へすすむ →
@@ -633,18 +697,18 @@ export default function Home() {
 
         {/* ===== Final Results ===== */}
         {phase === "finalResults" && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="text-center text-xs font-bold text-drd-purple-light bg-drd-purple/10 rounded-lg py-1.5 mb-5">
               🔍 経過観察の結果
             </div>
             <div className="flex items-center justify-center gap-4 mb-6">
-              <span className="text-[#8b949e]">最終確認</span>
+              <span className="text-[#8C7B6B]">最終確認</span>
               <span className="text-5xl font-bold bg-gradient-to-r from-drd-teal to-drd-purple bg-clip-text text-transparent">
                 {fAns.filter((a) => a.correct).length}/{fQs.length}
               </span>
             </div>
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-drd-bg font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-white font-bold py-3.5 rounded-xl transition-colors"
               onClick={() => doReport()}
             >
               カルテを作成する →
@@ -654,25 +718,30 @@ export default function Home() {
 
         {/* ===== Report ===== */}
         {phase === "report" && report && (
-          <div className="animate-fade-in w-full max-w-lg bg-drd-bg2 border border-[#30363d] rounded-2xl p-6">
+          <div className="animate-fade-in w-full max-w-lg bg-white border border-[#E8DDD0] rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-6">
               <span className="text-3xl">📋</span>
               <h2 className="text-xl font-bold">学習カルテ</h2>
             </div>
 
-            <div className="bg-drd-bg rounded-xl border border-[#30363d] p-4 mb-5 space-y-4">
+            <div className="bg-drd-bg rounded-xl border border-[#E8DDD0] p-4 mb-5 space-y-4">
               {/* Meta */}
-              <div className="flex justify-between text-sm text-[#8b949e]">
-                <span>👤 {report.name}（{report.grade}）</span>
+              <div className="flex justify-between text-sm text-[#8C7B6B]">
+                <div>
+                  <span>👤 {report.name}（{report.grade}）</span>
+                  <div className="text-xs text-drd-amber font-semibold mt-0.5">
+                    {getTitleForLevel(report.level.level)}
+                  </div>
+                </div>
                 <span>📅 {report.date}</span>
               </div>
 
               {/* Subject */}
               <div>
-                <h3 className="text-xs font-bold text-[#8b949e] mb-1">📚 科目</h3>
+                <h3 className="text-xs font-bold text-[#8C7B6B] mb-1">📚 科目</h3>
                 <p className="text-lg font-semibold">{report.topic}</p>
-                {report.subtopic && <p className="text-sm text-[#8b949e] mt-0.5">📎 範囲: {report.subtopic}</p>}
-                <span className="text-xs text-[#484f58] mt-1 inline-block">
+                {report.subtopic && <p className="text-sm text-[#8C7B6B] mt-0.5">📎 範囲: {report.subtopic}</p>}
+                <span className="text-xs text-[#BDB0A3] mt-1 inline-block">
                   難易度 {"★".repeat(report.difficulty) + "☆".repeat(5 - report.difficulty)}
                 </span>
               </div>
@@ -680,17 +749,17 @@ export default function Home() {
               {/* Scores */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center bg-drd-bg2 rounded-xl py-3">
-                  <div className="text-xs text-[#8b949e] mb-1">理解度</div>
+                  <div className="text-xs text-[#8C7B6B] mb-1">理解度</div>
                   <div className="text-lg font-bold text-drd-purple-light">{report.assessScore}/5</div>
                 </div>
                 <div className="text-center bg-drd-bg2 rounded-xl py-3">
-                  <div className="text-xs text-[#8b949e] mb-1">診断</div>
+                  <div className="text-xs text-[#8C7B6B] mb-1">診断</div>
                   <div className={`text-lg font-bold ${report.quizScore >= 7 ? "text-drd-teal" : "text-drd-amber"}`}>
                     {report.quizScore}/10
                   </div>
                 </div>
                 <div className="text-center bg-drd-bg2 rounded-xl py-3">
-                  <div className="text-xs text-[#8b949e] mb-1">最終確認</div>
+                  <div className="text-xs text-[#8C7B6B] mb-1">最終確認</div>
                   <div className="text-lg font-bold">{report.finalScore}/{fQs.length || 3}</div>
                 </div>
               </div>
@@ -701,23 +770,22 @@ export default function Home() {
                   <span className="text-sm font-semibold text-drd-amber">✨ 獲得XP</span>
                   <span className="text-2xl font-bold text-drd-amber">+{report.totalXP}</span>
                 </div>
-                <div className="flex justify-between text-xs text-[#8b949e] mt-2">
-                  <span>Lv.{report.level.level}</span>
+                <div className="flex justify-between text-xs text-[#8C7B6B] mt-2">
+                  <span>Lv.{report.level.level} {getTitleForLevel(report.level.level)}</span>
                   <span>累計 {report.totalXPAll} XP</span>
-                  <span>{report.sessions}回目の診察</span>
                 </div>
               </div>
             </div>
 
             {/* Learning Plan */}
             {report.learningPlan && (
-              <div className="bg-drd-bg rounded-xl border border-[#30363d] px-4 py-4 mb-5">
-                <h3 className="text-xs font-bold text-[#8b949e] mb-2">💊 学習プラン</h3>
+              <div className="bg-drd-bg rounded-xl border border-[#E8DDD0] px-4 py-4 mb-5">
+                <h3 className="text-xs font-bold text-[#8C7B6B] mb-2">💊 学習プラン</h3>
                 {report.learningPlan.split("\n").filter(Boolean).map((l, i) => (
                   <p
                     key={i}
                     className={`text-sm leading-relaxed mb-1.5 ${
-                      l.startsWith("📌") ? "text-drd-amber font-medium" : "text-[#8b949e]"
+                      l.startsWith("📌") ? "text-drd-amber font-medium" : "text-[#8C7B6B]"
                     }`}
                   >
                     {l}
@@ -727,7 +795,7 @@ export default function Home() {
             )}
 
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-drd-bg font-bold py-3.5 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-white font-bold py-3.5 rounded-xl transition-colors"
               onClick={reset}
             >
               もういちど診察する 🔄

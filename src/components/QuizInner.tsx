@@ -225,7 +225,7 @@ export default function QuizInner({
     const base =
       "w-full flex items-center gap-3 rounded-xl px-4 py-3.5 text-left font-medium transition-all duration-200";
     if (!answered) {
-      return `${base} bg-drd-bg2 border border-[#30363d] hover:border-drd-amber/60 hover:bg-drd-bg3 cursor-pointer`;
+      return `${base} bg-drd-bg2 border border-[#E8DDD0] hover:border-drd-amber/60 hover:bg-drd-bg3 cursor-pointer`;
     }
     if (i === q.answer) {
       return `${base} bg-drd-teal/15 border-2 border-drd-teal`;
@@ -233,15 +233,15 @@ export default function QuizInner({
     if (i === selected && i !== q.answer) {
       return `${base} bg-drd-coral/15 border-2 border-drd-coral`;
     }
-    return `${base} bg-drd-bg2 border border-[#30363d] opacity-40`;
+    return `${base} bg-drd-bg2 border border-[#E8DDD0] opacity-40`;
   }
 
   function letterBadgeClass(i: number) {
     const base = "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0";
-    if (!answered) return `${base} bg-[#30363d] text-[#8b949e]`;
+    if (!answered) return `${base} bg-[#E8DDD0] text-[#8C7B6B]`;
     if (i === q.answer) return `${base} bg-drd-teal text-white`;
     if (i === selected && i !== q.answer) return `${base} bg-drd-coral text-white`;
-    return `${base} bg-[#30363d] text-[#8b949e] opacity-40`;
+    return `${base} bg-[#E8DDD0] text-[#8C7B6B] opacity-40`;
   }
 
   // Card glow animation
@@ -253,19 +253,19 @@ export default function QuizInner({
 
   return (
     <div
-      className={`animate-fade-in rounded-2xl bg-drd-bg2 border border-[#30363d] p-5 sm:p-6 max-w-lg mx-auto ${cardAnim}`}
+      className={`animate-fade-in rounded-2xl bg-drd-bg2 border border-[#E8DDD0] p-5 sm:p-6 max-w-lg mx-auto ${cardAnim}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-bold text-[#8b949e]">{tag}</span>
+        <span className="text-sm font-bold text-[#8C7B6B]">{tag}</span>
         <span className="text-sm font-bold text-drd-amber">
           {idx + 1}
-          <span className="text-[#8b949e]"> / {total}</span>
+          <span className="text-[#8C7B6B]"> / {total}</span>
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 rounded-full bg-[#30363d] mb-5">
+      <div className="h-1 rounded-full bg-[#E8DDD0] mb-5">
         <div
           className="h-full rounded-full bg-drd-amber transition-all duration-500"
           style={{ width: `${((idx + (answered ? 1 : 0)) / total) * 100}%` }}
@@ -301,8 +301,8 @@ export default function QuizInner({
             answered
               ? selected === -1
                 ? "bg-drd-coral/15 border-2 border-drd-coral"
-                : "bg-drd-bg2 border border-[#30363d] opacity-40"
-              : "bg-transparent border border-dashed border-[#30363d] text-[#8b949e] hover:border-[#8b949e] cursor-pointer"
+                : "bg-drd-bg2 border border-[#E8DDD0] opacity-40"
+              : "bg-transparent border border-dashed border-[#E8DDD0] text-[#8C7B6B] hover:border-[#8C7B6B] cursor-pointer"
           }`}
           onClick={() => handleSelect(-1)}
           disabled={answered}
@@ -365,7 +365,7 @@ export default function QuizInner({
           </div>
 
           {showExplanation && (
-            <div className="animate-fade-in bg-drd-purple/10 border border-drd-purple/30 rounded-xl px-4 py-3 text-sm leading-relaxed text-[#c9d1d9]">
+            <div className="animate-fade-in bg-drd-purple/10 border border-drd-purple/30 rounded-xl px-4 py-3 text-sm leading-relaxed text-[#5D4E3C]">
               {q.explanation}
             </div>
           )}
@@ -379,7 +379,7 @@ export default function QuizInner({
                   <span className="text-lg">🧬</span>
                   <span className="text-sm font-bold text-drd-teal">Dr.D と一緒に考えよう</span>
                 </div>
-                <span className="text-xs text-[#8b949e]">
+                <span className="text-xs text-[#8C7B6B]">
                   {tutorTurns}/{MAX_TUTOR_TURNS}回
                 </span>
               </div>
@@ -397,15 +397,15 @@ export default function QuizInner({
                     <div
                       className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-drd-amber/15 text-[#e6edf3] rounded-br-none"
-                          : "bg-drd-bg2 border border-[#30363d] text-[#c9d1d9] rounded-bl-none"
+                          ? "bg-drd-amber/15 text-[#333] rounded-br-none"
+                          : "bg-drd-bg2 border border-[#E8DDD0] text-[#5D4E3C] rounded-bl-none"
                       }`}
                     >
                       {msg.content || (
                         <span className="inline-flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-[#8b949e] rounded-full animate-bounce" />
-                          <span className="w-1.5 h-1.5 bg-[#8b949e] rounded-full animate-bounce [animation-delay:0.15s]" />
-                          <span className="w-1.5 h-1.5 bg-[#8b949e] rounded-full animate-bounce [animation-delay:0.3s]" />
+                          <span className="w-1.5 h-1.5 bg-[#BDB0A3] rounded-full animate-bounce" />
+                          <span className="w-1.5 h-1.5 bg-[#BDB0A3] rounded-full animate-bounce [animation-delay:0.15s]" />
+                          <span className="w-1.5 h-1.5 bg-[#BDB0A3] rounded-full animate-bounce [animation-delay:0.3s]" />
                         </span>
                       )}
                     </div>
@@ -416,9 +416,9 @@ export default function QuizInner({
 
               {/* Chat input */}
               {tutorTurns < MAX_TUTOR_TURNS ? (
-                <div className="flex gap-2 px-3 py-2 border-t border-[#30363d] bg-drd-bg2">
+                <div className="flex gap-2 px-3 py-2 border-t border-[#E8DDD0] bg-drd-bg2">
                   <input
-                    className="flex-1 bg-drd-bg border border-[#30363d] rounded-lg px-3 py-2 text-sm outline-none focus:border-drd-teal transition-colors placeholder:text-[#484f58]"
+                    className="flex-1 bg-drd-bg border border-[#E8DDD0] rounded-lg px-3 py-2 text-sm outline-none focus:border-drd-teal transition-colors placeholder:text-[#BDB0A3]"
                     value={tutorInput}
                     onChange={(e) => setTutorInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") handleTutorSubmit(); }}
@@ -434,8 +434,8 @@ export default function QuizInner({
                   </button>
                 </div>
               ) : (
-                <div className="px-4 py-3 border-t border-[#30363d] bg-drd-bg2 text-center">
-                  <p className="text-xs text-[#8b949e] mb-2">
+                <div className="px-4 py-3 border-t border-[#E8DDD0] bg-drd-bg2 text-center">
+                  <p className="text-xs text-[#8C7B6B] mb-2">
                     会話の上限に達しました。解説を確認してみよう！
                   </p>
                   {!showExplanation && (
@@ -454,7 +454,7 @@ export default function QuizInner({
           {/* Next button */}
           {showNextBtn && (
             <button
-              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-drd-bg font-bold py-3 rounded-xl transition-colors"
+              className="w-full bg-drd-amber hover:bg-drd-amber/90 text-white font-bold py-3 rounded-xl transition-colors"
               onClick={handleNext}
             >
               {isLast ? finishLabel : "つぎへ →"}
