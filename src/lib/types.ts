@@ -1,4 +1,5 @@
 export interface QuizQuestion {
+  id?: string;
   q: string;
   choices: string[];
   answer: number;

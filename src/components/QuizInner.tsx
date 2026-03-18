@@ -8,10 +8,18 @@ interface Props {
   q: QuizQuestion;
   idx: number;
   total: number;
+  reporterName?: string;
   onResult: (r: SessionResult) => void;
   onFinish: (action: "next" | "done") => void;
   finishLabel: string;
 }
+
+const REPORT_TYPES = [
+  { value: "wrong_answer", label: "正解が違う" },
+  { value: "bad_question", label: "問題文がおかしい" },
+  { value: "duplicate_choices", label: "選択肢が重複" },
+  { value: "other", label: "その他" },
+] as const;
 
 interface TutorMessage {
   role: "user" | "assistant";
@@ -26,6 +34,7 @@ export default function QuizInner({
   q,
   idx,
   total,
+  reporterName,
   onResult,
   onFinish,
   finishLabel,
@@ -46,6 +55,13 @@ export default function QuizInner({
   const [tutorLoading, setTutorLoading] = useState(false);
   const [tutorTurns, setTutorTurns] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Report state
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportType, setReportType] = useState<string>("");
+  const [reportComment, setReportComment] = useState("");
+  const [reportSending, setReportSending] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
 
   const answered = selected !== null;
   const isCorrect = answered && selected === q.answer;
@@ -215,6 +231,30 @@ export default function QuizInner({
     const msg = tutorInput.trim();
     if (!msg || tutorLoading) return;
     sendTutorMessage(msg);
+  };
+
+  // --- Report ---
+  const handleReport = async () => {
+    if (!reportType || reportSending || !q.id) return;
+    setReportSending(true);
+    try {
+      const res = await fetch("/api/quiz/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question_id: q.id,
+          reporter_name: reporterName || "ゲスト",
+          report_type: reportType,
+          comment: reportComment.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok || data.duplicate) {
+        setReportDone(true);
+        setTimeout(() => setReportOpen(false), 2000);
+      }
+    } catch { /* ignore */ }
+    finally { setReportSending(false); }
   };
 
   // Need manual "next" button?
@@ -448,6 +488,64 @@ export default function QuizInner({
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Report link */}
+          {q.id && !reportOpen && !reportDone && (
+            <button
+              className="text-xs text-[#BDB0A3] hover:text-drd-coral transition-colors"
+              onClick={() => { setReportOpen(true); if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } }}
+            >
+              🚩 この問題おかしい？
+            </button>
+          )}
+          {reportDone && (
+            <div className="text-xs text-drd-teal text-center py-1">
+              ありがとう！確認後にXPがもらえるよ 🎁
+            </div>
+          )}
+
+          {/* Report modal */}
+          {reportOpen && !reportDone && (
+            <div className="animate-fade-in bg-white border border-[#E8DDD0] rounded-xl p-4 space-y-3">
+              <h4 className="text-sm font-bold">🚩 問題を報告</h4>
+              <div className="flex flex-col gap-1.5">
+                {REPORT_TYPES.map((rt) => (
+                  <label key={rt.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="reportType"
+                      value={rt.value}
+                      checked={reportType === rt.value}
+                      onChange={() => setReportType(rt.value)}
+                      className="accent-drd-amber"
+                    />
+                    {rt.label}
+                  </label>
+                ))}
+              </div>
+              <input
+                className="w-full bg-drd-bg border border-[#E8DDD0] rounded-lg px-3 py-2 text-sm outline-none focus:border-drd-amber transition-colors placeholder:text-[#BDB0A3]"
+                value={reportComment}
+                onChange={(e) => setReportComment(e.target.value)}
+                placeholder="詳細（任意）"
+              />
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 bg-drd-amber hover:bg-drd-amber/90 disabled:opacity-40 text-white font-bold py-2 rounded-lg text-sm transition-colors"
+                  onClick={handleReport}
+                  disabled={!reportType || reportSending}
+                >
+                  {reportSending ? "送信中..." : "報告する"}
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg text-sm text-[#8C7B6B] hover:bg-drd-bg3 transition-colors"
+                  onClick={() => setReportOpen(false)}
+                >
+                  やめる
+                </button>
+              </div>
             </div>
           )}
 

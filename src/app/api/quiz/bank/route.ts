@@ -61,6 +61,7 @@ export async function GET(req: Request) {
     const questions = shuffled.map((q) => {
       const answerIdx = (q.choices as string[]).indexOf(q.answer as string);
       return {
+        id: q.id,
         q: q.q,
         choices: q.choices as string[],
         answer: answerIdx === -1 ? 0 : answerIdx,

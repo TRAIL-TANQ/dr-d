@@ -554,6 +554,7 @@ export default function Home() {
             q={aQs[aIdx]}
             idx={aIdx}
             total={aQs.length}
+            reporterName={name}
             onResult={onAResult}
             onFinish={onAFinish}
             finishLabel="結果を見る →"
@@ -622,6 +623,7 @@ export default function Home() {
             q={qQs[qIdx]}
             idx={qIdx}
             total={10}
+            reporterName={name}
             onResult={onQResult}
             onFinish={onQFinish}
             finishLabel="結果を見る →"
@@ -689,6 +691,7 @@ export default function Home() {
             q={fQs[fIdx]}
             idx={fIdx}
             total={fQs.length}
+            reporterName={name}
             onResult={onFResult}
             onFinish={onFFinish}
             finishLabel="カルテを作成 →"
