@@ -50,7 +50,7 @@ export default function Home() {
     case "checkin":
       return <CheckinScreen liffProfile={liffProfile} />;
     case "seat":
-      return <SeatScreen />;
+      return <SeatScreen liffProfile={liffProfile} />;
     case "timer":
       return <TimerScreen liffProfile={liffProfile} />;
     case "report":
