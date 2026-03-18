@@ -215,14 +215,14 @@ export default function SeatScreen({ liffProfile }: Props) {
 
       {/* ── Solo seats ── */}
       <SectionLabel text="🪑 ひとり席" sub="予約制・110分学習+10分片付け" />
-      <div className="grid grid-cols-5 gap-2 mb-2">
+      <div className="grid grid-cols-5 gap-3 mb-2.5">
         {soloSeats.slice(0, 5).map((s) => (
-          <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} />
+          <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} size="md" />
         ))}
       </div>
-      <div className="grid grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-5 gap-3 mb-3">
         {soloSeats.slice(5, 10).map((s) => (
-          <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} />
+          <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} size="md" />
         ))}
       </div>
 
@@ -292,12 +292,12 @@ export default function SeatScreen({ liffProfile }: Props) {
 
       {/* ── Free seats ── */}
       <SectionLabel text="🪑 自由席" sub="先着順・2時間" />
-      <div className="flex gap-3 justify-center mb-4">
+      <div className="flex gap-5 justify-center mb-5">
         {Array.from(freeTables.entries()).map(([table, tableSeats]) => (
-          <div key={table} className="flex flex-col gap-2 items-center">
-            <p className="text-[10px] text-[#8C7B6B] font-semibold">卓{table}</p>
+          <div key={table} className="flex flex-col gap-2.5 items-center">
+            <p className="text-xs text-[#8C7B6B] font-semibold">卓{table}</p>
             {tableSeats.map((s) => (
-              <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} />
+              <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} size="lg" />
             ))}
           </div>
         ))}
@@ -305,9 +305,9 @@ export default function SeatScreen({ liffProfile }: Props) {
 
       {/* ── Reading seats ── */}
       <SectionLabel text="📖 読書スペース" sub="先着順・30分・1日1回" />
-      <div className="flex gap-2 justify-center mb-6">
+      <div className="flex gap-3 justify-center mb-6">
         {readSeats.map((s) => (
-          <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} />
+          <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} size="lg" />
         ))}
       </div>
 
@@ -374,18 +374,22 @@ export default function SeatScreen({ liffProfile }: Props) {
 
 // ─── Sub-components ───
 
-function SeatButton({ seat, selected, onTap }: { seat: Seat; selected: boolean; onTap: (s: Seat) => void }) {
+function SeatButton({ seat, selected, onTap, size = "md" }: { seat: Seat; selected: boolean; onTap: (s: Seat) => void; size?: "md" | "lg" }) {
   const isMine = seat.status === "reserved_self" || seat.status === "occupied_self";
   const isOther = seat.status === "reserved_other" || seat.status === "occupied_other";
   const colors = selected
     ? { bg: "#EBF2FF", border: "#5B9BF5", text: "#3A7CE8" }
     : STATUS_COLORS[seat.status];
 
+  const sizeClass = size === "lg"
+    ? "min-w-[64px] min-h-[64px] p-3.5 text-base"
+    : "min-w-[56px] min-h-[56px] p-2.5 text-sm";
+
   return (
     <button
       onClick={() => onTap(seat)}
       disabled={isOther}
-      className="relative w-full aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all active:scale-95 disabled:cursor-not-allowed"
+      className={`relative w-full aspect-square rounded-xl flex flex-col items-center justify-center font-bold transition-all active:scale-95 disabled:cursor-not-allowed ${sizeClass}`}
       style={{
         backgroundColor: colors.bg,
         border: `2px solid ${colors.border}`,
@@ -393,8 +397,8 @@ function SeatButton({ seat, selected, onTap }: { seat: Seat; selected: boolean; 
         opacity: isOther ? 0.6 : 1,
       }}
     >
-      <span className="text-sm">{seat.id}</span>
-      {isMine && <span className="text-[8px] mt-0.5">{seat.status === "reserved_self" ? "予約" : "利用中"}</span>}
+      <span className={size === "lg" ? "text-base" : "text-sm"}>{seat.id}</span>
+      {isMine && <span className="text-[9px] mt-0.5">{seat.status === "reserved_self" ? "予約" : "利用中"}</span>}
     </button>
   );
 }
