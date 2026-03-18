@@ -74,7 +74,7 @@ export default function CheckinScreen({ liffProfile }: Props) {
       setCheckedIn(true);
       setCheckInTime(new Date().toISOString());
       setStats((s) => s ? { ...s, streak: res.streak, xp: res.xp, level: res.level } : s);
-      showToast(`入室できたよ！+${res.earnedXp} XP 🎉`);
+      showToast(res.isFirstToday ? `入室できたよ！+${res.earnedXp} XP 🎉` : "おかえり！");
     } else if (res.alreadyCheckedIn) {
       showToast("すでに入室中です");
     }

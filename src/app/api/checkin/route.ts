@@ -131,6 +131,17 @@ async function handleCheckin(lineUserId: string, name?: string) {
   let currentXp = 0;
   let currentLevel = 1;
 
+  // Check if already checked in today (for XP dedup)
+  const { count: todayCheckins } = await supabase
+    .from("check_ins")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", lineUserId)
+    .gte("checked_in_at", today + "T00:00:00")
+    .lte("checked_in_at", today + "T23:59:59");
+
+  const isFirstToday = (todayCheckins ?? 0) === 0;
+  const xpToAdd = isFirstToday ? 30 : 0;
+
   if (existingUser) {
     currentXp = existingUser.xp;
     currentLevel = existingUser.level;
@@ -145,7 +156,7 @@ async function handleCheckin(lineUserId: string, name?: string) {
       newStreak = lastVisit === yesterdayStr ? existingUser.streak + 1 : 1;
     }
 
-    const newXp = currentXp + 30;
+    const newXp = currentXp + xpToAdd;
     const newLevel = Math.floor(newXp / 100) + 1;
 
     await supabase
@@ -162,7 +173,7 @@ async function handleCheckin(lineUserId: string, name?: string) {
     currentXp = newXp;
     currentLevel = newLevel;
   } else {
-    const newXp = 30;
+    const newXp = 30; // first ever = always first today
     const newLevel = 1;
     await supabase.from("users").insert({
       line_user_id: lineUserId,
@@ -179,7 +190,7 @@ async function handleCheckin(lineUserId: string, name?: string) {
   // Insert check-in
   const { data: checkIn, error } = await supabase
     .from("check_ins")
-    .insert({ user_id: lineUserId, earned_xp: 30 })
+    .insert({ user_id: lineUserId, earned_xp: xpToAdd })
     .select("id, checked_in_at")
     .single();
 
@@ -193,7 +204,8 @@ async function handleCheckin(lineUserId: string, name?: string) {
     streak: newStreak,
     xp: currentXp,
     level: currentLevel,
-    earnedXp: 30,
+    earnedXp: xpToAdd,
+    isFirstToday,
   });
 }
 
