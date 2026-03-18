@@ -54,9 +54,9 @@ export default function Home() {
     case "timer":
       return <TimerScreen liffProfile={liffProfile} />;
     case "report":
-      return <ReportScreen />;
+      return <ReportScreen liffProfile={liffProfile} />;
     case "settings":
-      return <SettingsScreen />;
+      return <SettingsScreen liffProfile={liffProfile} />;
     default:
       return <CheckinScreen liffProfile={liffProfile} />;
   }
