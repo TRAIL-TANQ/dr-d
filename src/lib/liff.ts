@@ -11,46 +11,60 @@ export type LiffProfile = {
 const SS_KEY = "den-screen";
 const VALID_SCREENS = ["checkin", "seat", "drd", "timer", "report", "settings"];
 
+/** Fully decoded URL for debug display */
+export let debugDecoded = "";
+
 /**
  * Extract screen name from current URL.
- * Priority:
- *   1. ?screen=xxx (normal browser)
- *   2. ?liff.state=xxx (LIFF redirect)
- *   3. ?seat (liff.state bare value — LIFF puts liff.state as raw query)
- *   4. sessionStorage (saved before liff.init redirect)
- *   5. #hash
- *   6. default: checkin
+ * Handles double/triple-encoded liff.state values.
  */
 function extractScreen(): string {
   if (typeof window === "undefined") return "checkin";
 
-  const search = window.location.search;
-  const params = new URLSearchParams(search);
+  const fullUrl = window.location.href;
+  console.log("[LIFF Router] href:", fullUrl);
 
-  console.log("[LIFF Router] href:", window.location.href);
+  // Fully decode URL (up to 3 levels for liff.state double-encoding)
+  let decoded = fullUrl;
+  for (let i = 0; i < 3; i++) {
+    try { decoded = decodeURIComponent(decoded); } catch { break; }
+  }
+  debugDecoded = decoded;
+  console.log("[LIFF Router] decoded:", decoded);
 
-  // 1. ?screen=xxx
+  // 1. Scan fully-decoded URL for screen names (handles any encoding depth)
+  // Check longer names first to avoid substring false matches
+  const sortedScreens = [...VALID_SCREENS].sort((a, b) => b.length - a.length);
+  for (const s of sortedScreens) {
+    // Match /seat, =seat, ?seat but not partial matches (e.g. "seated")
+    const pattern = new RegExp(`[/=?&]${s}(?=[/&#?]|$)`);
+    if (pattern.test(decoded)) {
+      console.log("[LIFF Router] from decoded URL scan:", s);
+      return s;
+    }
+  }
+
+  // 2. ?screen= parameter (normal browser)
+  const params = new URLSearchParams(window.location.search);
   const screen = params.get("screen");
   if (screen && VALID_SCREENS.includes(screen)) {
     console.log("[LIFF Router] from ?screen=", screen);
     return screen;
   }
 
-  // 2. ?liff.state=xxx
-  const liffState = params.get("liff.state");
-  if (liffState && VALID_SCREENS.includes(liffState)) {
-    console.log("[LIFF Router] from liff.state=", liffState);
-    return liffState;
+  // 3. liff.state parameter with recursive decode
+  let liffState = params.get("liff.state") || "";
+  for (let i = 0; i < 3; i++) {
+    try { liffState = decodeURIComponent(liffState); } catch { break; }
+  }
+  for (const s of sortedScreens) {
+    if (liffState.includes(s)) {
+      console.log("[LIFF Router] from liff.state decode:", s);
+      return s;
+    }
   }
 
-  // 3. Bare query: ?seat → search = "?seat"
-  const raw = search.replace("?", "").split("&")[0];
-  if (raw && VALID_SCREENS.includes(raw)) {
-    console.log("[LIFF Router] from bare query:", raw);
-    return raw;
-  }
-
-  // 4. sessionStorage (saved before liff.init wiped the URL)
+  // 4. sessionStorage (saved before liff.init redirect)
   const saved = sessionStorage.getItem(SS_KEY);
   if (saved && VALID_SCREENS.includes(saved)) {
     console.log("[LIFF Router] from sessionStorage:", saved);
@@ -58,8 +72,8 @@ function extractScreen(): string {
     return saved;
   }
 
-  // 5. Hash: #seat
-  const hash = window.location.hash.replace("#", "");
+  // 5. Hash fragment (before & params)
+  const hash = window.location.hash.split("&")[0].replace("#", "");
   if (hash && VALID_SCREENS.includes(hash)) {
     console.log("[LIFF Router] from hash:", hash);
     return hash;

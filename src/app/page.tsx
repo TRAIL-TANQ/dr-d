@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { initLiff, getProfile, type LiffProfile } from "@/lib/liff";
+import { initLiff, getProfile, debugDecoded, type LiffProfile } from "@/lib/liff";
 import DrDScreen from "@/components/screens/DrDScreen";
 import CheckinScreen from "@/components/screens/CheckinScreen";
 import SeatScreen from "@/components/screens/SeatScreen";
@@ -53,7 +53,7 @@ export default function Home() {
       background: "red", color: "white", fontSize: 10,
       padding: 4, zIndex: 9999, wordBreak: "break-all",
     }}>
-      URL: {debugUrl} | screen: {screen}
+      URL: {debugUrl} | screen: {screen} | decoded: {debugDecoded.substring(0, 100)}
     </div>
   );
 
