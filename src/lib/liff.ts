@@ -8,41 +8,64 @@ export type LiffProfile = {
   userId: string;
 };
 
-const SS_KEY = "drd_screen";
+const SS_KEY = "den-screen";
+const VALID_SCREENS = ["checkin", "seat", "drd", "timer", "report", "settings"];
 
 /**
- * Capture screen param BEFORE liff.init() rewrites the URL.
- * Priority: sessionStorage > ?screen= > #hash > default
+ * Extract screen name from current URL.
+ * Priority:
+ *   1. ?screen=xxx (normal browser)
+ *   2. ?liff.state=xxx (LIFF redirect)
+ *   3. ?seat (liff.state bare value — LIFF puts liff.state as raw query)
+ *   4. sessionStorage (saved before liff.init redirect)
+ *   5. #hash
+ *   6. default: checkin
  */
-function captureScreenParam(): string {
+function extractScreen(): string {
   if (typeof window === "undefined") return "checkin";
 
-  // 1. Already saved in sessionStorage (survives liff.init redirect)
-  const saved = sessionStorage.getItem(SS_KEY);
-  if (saved) return saved;
+  const search = window.location.search;
+  const params = new URLSearchParams(search);
 
-  // 2. Query parameter ?screen=xxx
-  const params = new URLSearchParams(window.location.search);
-  const fromQuery = params.get("screen");
-  if (fromQuery) {
-    sessionStorage.setItem(SS_KEY, fromQuery);
-    return fromQuery;
+  console.log("[LIFF Router] href:", window.location.href);
+
+  // 1. ?screen=xxx
+  const screen = params.get("screen");
+  if (screen && VALID_SCREENS.includes(screen)) {
+    console.log("[LIFF Router] from ?screen=", screen);
+    return screen;
   }
 
-  // 3. Hash fallback #seat, #timer, etc.
+  // 2. ?liff.state=xxx
+  const liffState = params.get("liff.state");
+  if (liffState && VALID_SCREENS.includes(liffState)) {
+    console.log("[LIFF Router] from liff.state=", liffState);
+    return liffState;
+  }
+
+  // 3. Bare query: ?seat → search = "?seat"
+  const raw = search.replace("?", "").split("&")[0];
+  if (raw && VALID_SCREENS.includes(raw)) {
+    console.log("[LIFF Router] from bare query:", raw);
+    return raw;
+  }
+
+  // 4. sessionStorage (saved before liff.init wiped the URL)
+  const saved = sessionStorage.getItem(SS_KEY);
+  if (saved && VALID_SCREENS.includes(saved)) {
+    console.log("[LIFF Router] from sessionStorage:", saved);
+    sessionStorage.removeItem(SS_KEY);
+    return saved;
+  }
+
+  // 5. Hash: #seat
   const hash = window.location.hash.replace("#", "");
-  if (hash) {
-    sessionStorage.setItem(SS_KEY, hash);
+  if (hash && VALID_SCREENS.includes(hash)) {
+    console.log("[LIFF Router] from hash:", hash);
     return hash;
   }
 
-  // 4. Path-based: /seat, /timer (when LIFF endpoint includes path)
-  const path = window.location.pathname.split("/").filter(Boolean).pop();
-  if (path && path !== "" && path !== "index") {
-    sessionStorage.setItem(SS_KEY, path);
-    return path;
-  }
-
+  console.log("[LIFF Router] default: checkin");
   return "checkin";
 }
 
@@ -51,38 +74,46 @@ function captureScreenParam(): string {
  * Returns the screen parameter value (defaults to "checkin").
  */
 export async function initLiff(): Promise<string> {
-  // Capture BEFORE init (critical — liff.init strips query params)
-  const screen = captureScreenParam();
+  // Capture BEFORE init (liff.init may redirect and strip params)
+  const preInitScreen = extractScreen();
+  if (preInitScreen !== "checkin") {
+    sessionStorage.setItem(SS_KEY, preInitScreen);
+  }
 
-  if (initialized) return screen;
+  if (initialized) return preInitScreen;
 
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
   if (!liffId) {
     console.warn("LIFF ID not set, running in browser-only mode");
     initialized = true;
-    return screen;
+    return preInitScreen;
   }
 
   try {
     await liff.init({ liffId });
     initialized = true;
+    console.log("[LIFF Router] liff.init() success, isInClient:", liff.isInClient());
   } catch (e) {
     console.error("LIFF init failed:", e);
     initialized = true;
   }
 
-  return screen;
+  // Re-extract after init (URL may have changed)
+  const postInitScreen = extractScreen();
+  const finalScreen = postInitScreen !== "checkin" ? postInitScreen : preInitScreen;
+  console.log("[LIFF Router] final screen:", finalScreen);
+  return finalScreen;
 }
 
 /**
  * Get the current screen param (no init needed).
  */
 export function getScreen(): string {
-  return captureScreenParam();
+  return extractScreen();
 }
 
 /**
- * Clear saved screen (call when navigating away or resetting).
+ * Clear saved screen.
  */
 export function clearScreen(): void {
   if (typeof window !== "undefined") {
