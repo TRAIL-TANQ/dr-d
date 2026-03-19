@@ -79,20 +79,38 @@ async function getAvailability(studentId: string) {
     .select("*")
     .order("id", { ascending: true });
 
-  if (seatErr) return NextResponse.json({ error: seatErr.message }, { status: 500 });
+  if (seatErr) {
+    console.error("seats query error:", seatErr);
+    return NextResponse.json({ error: seatErr.message }, { status: 500 });
+  }
 
-  // Get today's active reservations
-  const { data: reservations } = await supabase
-    .from("seat_reservations")
-    .select("*")
-    .eq("date", today)
-    .in("status", ["confirmed", "active"]);
+  if (!seats || seats.length === 0) {
+    return NextResponse.json({ seats: [], summary: [], myOccupancy: null, myReservation: null });
+  }
 
-  // Get current occupancy
-  const { data: occupancy } = await supabase
-    .from("current_occupancy")
-    .select("*")
-    .eq("started_date", today);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type Row = any;
+
+  // Get today's active reservations (gracefully handle missing table)
+  let reservations: Row[] = [];
+  try {
+    const { data } = await supabase
+      .from("seat_reservations")
+      .select("*")
+      .eq("date", today)
+      .in("status", ["confirmed", "active"]);
+    reservations = data ?? [];
+  } catch { /* table may not exist */ }
+
+  // Get current occupancy (gracefully handle missing table)
+  let occupancy: Row[] = [];
+  try {
+    const { data } = await supabase
+      .from("current_occupancy")
+      .select("*")
+      .eq("started_date", today);
+    occupancy = data ?? [];
+  } catch { /* table may not exist */ }
 
   // Build seat status
   const seatList = (seats ?? []).map((seat) => {
