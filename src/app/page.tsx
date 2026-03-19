@@ -17,14 +17,17 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen | null>(null);
   const [liffProfile, setLiffProfile] = useState<LiffProfile | null>(null);
   const [ready, setReady] = useState(false);
+  const [debugUrl, setDebugUrl] = useState("");
 
   useEffect(() => {
     (async () => {
+      setDebugUrl(window.location.href);
       const screenParam = await initLiff();
       const s = VALID_SCREENS.includes(screenParam as Screen)
         ? (screenParam as Screen)
         : "checkin";
       setScreen(s);
+      setDebugUrl(window.location.href + " → " + screenParam);
 
       const profile = await getProfile();
       if (profile) setLiffProfile(profile);
@@ -44,20 +47,39 @@ export default function Home() {
     );
   }
 
-  switch (screen) {
-    case "drd":
-      return <DrDScreen />;
-    case "checkin":
-      return <CheckinScreen liffProfile={liffProfile} />;
-    case "seat":
-      return <SeatScreen liffProfile={liffProfile} />;
-    case "timer":
-      return <TimerScreen liffProfile={liffProfile} />;
-    case "report":
-      return <ReportScreen liffProfile={liffProfile} />;
-    case "settings":
-      return <SettingsScreen liffProfile={liffProfile} />;
-    default:
-      return <CheckinScreen liffProfile={liffProfile} />;
-  }
+  const debugBar = (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0,
+      background: "red", color: "white", fontSize: 10,
+      padding: 4, zIndex: 9999, wordBreak: "break-all",
+    }}>
+      URL: {debugUrl} | screen: {screen}
+    </div>
+  );
+
+  const content = (() => {
+    switch (screen) {
+      case "drd":
+        return <DrDScreen />;
+      case "checkin":
+        return <CheckinScreen liffProfile={liffProfile} />;
+      case "seat":
+        return <SeatScreen liffProfile={liffProfile} />;
+      case "timer":
+        return <TimerScreen liffProfile={liffProfile} />;
+      case "report":
+        return <ReportScreen liffProfile={liffProfile} />;
+      case "settings":
+        return <SettingsScreen liffProfile={liffProfile} />;
+      default:
+        return <CheckinScreen liffProfile={liffProfile} />;
+    }
+  })();
+
+  return (
+    <>
+      {debugBar}
+      <div style={{ paddingTop: 20 }}>{content}</div>
+    </>
+  );
 }
