@@ -8,20 +8,59 @@ export type LiffProfile = {
   userId: string;
 };
 
+const SS_KEY = "drd_screen";
+
+/**
+ * Capture screen param BEFORE liff.init() rewrites the URL.
+ * Priority: sessionStorage > ?screen= > #hash > default
+ */
+function captureScreenParam(): string {
+  if (typeof window === "undefined") return "checkin";
+
+  // 1. Already saved in sessionStorage (survives liff.init redirect)
+  const saved = sessionStorage.getItem(SS_KEY);
+  if (saved) return saved;
+
+  // 2. Query parameter ?screen=xxx
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("screen");
+  if (fromQuery) {
+    sessionStorage.setItem(SS_KEY, fromQuery);
+    return fromQuery;
+  }
+
+  // 3. Hash fallback #seat, #timer, etc.
+  const hash = window.location.hash.replace("#", "");
+  if (hash) {
+    sessionStorage.setItem(SS_KEY, hash);
+    return hash;
+  }
+
+  // 4. Path-based: /seat, /timer (when LIFF endpoint includes path)
+  const path = window.location.pathname.split("/").filter(Boolean).pop();
+  if (path && path !== "" && path !== "index") {
+    sessionStorage.setItem(SS_KEY, path);
+    return path;
+  }
+
+  return "checkin";
+}
+
 /**
  * Initialize LIFF. Safe to call multiple times — only runs once.
- * Returns the ?screen= parameter value (defaults to "checkin").
+ * Returns the screen parameter value (defaults to "checkin").
  */
 export async function initLiff(): Promise<string> {
-  if (initialized) {
-    return getScreenParam();
-  }
+  // Capture BEFORE init (critical — liff.init strips query params)
+  const screen = captureScreenParam();
+
+  if (initialized) return screen;
 
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
   if (!liffId) {
     console.warn("LIFF ID not set, running in browser-only mode");
     initialized = true;
-    return getScreenParam();
+    return screen;
   }
 
   try {
@@ -29,26 +68,26 @@ export async function initLiff(): Promise<string> {
     initialized = true;
   } catch (e) {
     console.error("LIFF init failed:", e);
-    initialized = true; // still allow fallback
+    initialized = true;
   }
 
-  return getScreenParam();
-}
-
-/**
- * Read ?screen= from current URL.
- */
-function getScreenParam(): string {
-  if (typeof window === "undefined") return "checkin";
-  const params = new URLSearchParams(window.location.search);
-  return params.get("screen") || "checkin";
+  return screen;
 }
 
 /**
  * Get the current screen param (no init needed).
  */
 export function getScreen(): string {
-  return getScreenParam();
+  return captureScreenParam();
+}
+
+/**
+ * Clear saved screen (call when navigating away or resetting).
+ */
+export function clearScreen(): void {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(SS_KEY);
+  }
 }
 
 /**
