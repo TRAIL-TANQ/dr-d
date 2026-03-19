@@ -8,6 +8,21 @@ const supabase = createClient(
 
 const TODAY = () => new Date().toISOString().split("T")[0];
 
+// Infer zone from seat name if zone column doesn't exist
+function inferZone(name: string): "solo" | "free" | "reading" {
+  if (name.startsWith("A") || name.startsWith("B")) return "solo";
+  if (name.startsWith("F")) return "free";
+  if (name.startsWith("R")) return "reading";
+  return "free";
+}
+
+// Infer table number from seat name (F1-F3 → 1, F4-F6 → 2, F7-F9 → 3)
+function inferTableNumber(name: string): number | null {
+  if (!name.startsWith("F")) return null;
+  const num = parseInt(name.slice(1), 10);
+  return Math.ceil(num / 3);
+}
+
 /**
  * GET /api/seats?action=availability&student_id=xxx
  */
@@ -58,11 +73,11 @@ export async function POST(req: Request) {
 async function getAvailability(studentId: string) {
   const today = TODAY();
 
-  // Get all seats
+  // Get all seats (order by name if display_order doesn't exist)
   const { data: seats, error: seatErr } = await supabase
     .from("seats")
     .select("*")
-    .order("display_order", { ascending: true });
+    .order("id", { ascending: true });
 
   if (seatErr) return NextResponse.json({ error: seatErr.message }, { status: 500 });
 
@@ -81,10 +96,11 @@ async function getAvailability(studentId: string) {
 
   // Build seat status
   const seatList = (seats ?? []).map((seat) => {
+    const seatName = seat.name ?? String(seat.id);
     const res = (reservations ?? []).find(
-      (r) => r.seat_id === seat.id && ["confirmed", "active"].includes(r.status),
+      (r) => (r.seat_id === seatName || r.seat_id === String(seat.id)) && ["confirmed", "active"].includes(r.status),
     );
-    const occ = (occupancy ?? []).find((o) => o.seat_id === seat.id);
+    const occ = (occupancy ?? []).find((o) => o.seat_id === seatName || o.seat_id === String(seat.id));
 
     let status: "available" | "reserved_self" | "reserved_other" | "occupied_self" | "occupied_other" = "available";
     let occupant: string | null = null;
@@ -103,12 +119,13 @@ async function getAvailability(studentId: string) {
     }
 
     return {
-      id: seat.id,
-      zone: seat.zone,
-      zone_label: seat.zone_label,
-      table_number: seat.table_number,
-      is_reservable: seat.is_reservable,
-      max_duration_min: seat.max_duration_min,
+      id: seatName,              // Use seat name (A1, F3, R2) as display id
+      db_id: seat.id,            // Keep numeric id for DB operations
+      zone: seat.zone ?? inferZone(seatName),
+      zone_label: seat.zone_label ?? "",
+      table_number: seat.table_number ?? inferTableNumber(seat.name ?? ""),
+      is_reservable: seat.is_reservable ?? inferZone(seatName) === "solo",
+      max_duration_min: seat.max_duration_min ?? (inferZone(seatName) === "reading" ? 30 : 120),
       status,
       occupant,
       ends_at: endsAt,
