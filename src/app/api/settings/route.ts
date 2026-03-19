@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
   const { data: user } = await supabase
     .from("users")
-    .select("name, grade, school, xp, level, streak")
+    .select("name, grade, school, xp, level, streak, trial_start_date, trial_end_date, plan_status")
     .eq("line_user_id", userId)
     .single();
 

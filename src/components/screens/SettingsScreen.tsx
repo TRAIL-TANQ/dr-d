@@ -22,6 +22,9 @@ type UserData = {
   school: string;
   xp: number;
   level: number;
+  trial_start_date: string | null;
+  trial_end_date: string | null;
+  plan_status: string | null;
 };
 
 export default function SettingsScreen({ liffProfile }: Props) {
@@ -128,16 +131,8 @@ export default function SettingsScreen({ liffProfile }: Props) {
         </div>
       </div>
 
-      {/* Plan card */}
-      <div className="bg-gradient-to-r from-[#FFF7ED] to-[#FEF3C7] border border-[#FBBF24]/30 rounded-2xl p-4 mb-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-sm font-bold text-[#92400E]">マンスリープラン</p>
-            <p className="text-xs text-[#A16207]">次回更新: 2026/04/01</p>
-          </div>
-          <p className="text-lg font-bold text-[#92400E]">¥9,800</p>
-        </div>
-      </div>
+      {/* Plan section */}
+      <PlanSection user={user} />
 
       {/* Menu list */}
       <div className="bg-white border border-[#F0E6D6] rounded-2xl overflow-hidden shadow-sm">
@@ -218,6 +213,85 @@ export default function SettingsScreen({ liffProfile }: Props) {
           </div>
         </BottomSheet>
       )}
+    </div>
+  );
+}
+
+function PlanSection({ user }: { user: UserData | null }) {
+  const planStatus = user?.plan_status ?? "trial";
+  const trialStart = user?.trial_start_date;
+  const trialEnd = user?.trial_end_date;
+
+  if (planStatus === "trial" && trialEnd) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(trialEnd + "T00:00:00");
+    const startDate = trialStart ? new Date(trialStart + "T00:00:00") : new Date(endDate.getTime() - 14 * 86400000);
+    const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000);
+    const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / 86400000));
+    const elapsed = totalDays - daysLeft;
+    const pct = Math.min(100, (elapsed / totalDays) * 100);
+    const expired = daysLeft <= 0;
+
+    if (expired) {
+      return (
+        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-2xl p-4 mb-4">
+          <p className="text-sm font-bold text-[#DC2626] mb-1">おためし期間が終了しました</p>
+          <p className="text-xs text-[#991B1B] mb-3">プランを選んで学習を続けよう！</p>
+          <div className="bg-gradient-to-r from-[#FFF7ED] to-[#FEF3C7] border border-[#FBBF24]/30 rounded-xl p-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-bold text-[#92400E]">マンスリープラン</p>
+                <p className="text-[10px] text-[#A16207]">月額・いつでも解約OK</p>
+              </div>
+              <p className="text-lg font-bold text-[#92400E]">¥9,800</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {/* Trial banner */}
+        <div className="bg-[#F0FDF4] border border-[#86EFAC] rounded-2xl p-4 mb-3">
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-sm font-bold text-[#166534]">🎁 2週間無料おためし中！</p>
+            <p className="text-sm font-bold text-[#166534]">あと{daysLeft}日</p>
+          </div>
+          <div className="h-2 bg-[#DCFCE7] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#4ADE80] rounded-full transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-[#15803D] mt-1.5">{elapsed}日経過 / {totalDays}日間</p>
+        </div>
+
+        {/* Plan card */}
+        <div className="bg-gradient-to-r from-[#FFF7ED] to-[#FEF3C7] border border-[#FBBF24]/30 rounded-2xl p-4 mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <p className="text-sm font-bold text-[#92400E]">おためし → マンスリー</p>
+              <p className="text-[10px] text-[#A16207]">おためし終了後に自動でマンスリーに移行</p>
+            </div>
+            <p className="text-lg font-bold text-[#92400E]">¥9,800<span className="text-xs font-normal">/月</span></p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Active plan
+  return (
+    <div className="bg-gradient-to-r from-[#FFF7ED] to-[#FEF3C7] border border-[#FBBF24]/30 rounded-2xl p-4 mb-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <p className="text-sm font-bold text-[#92400E]">マンスリープラン</p>
+          <p className="text-xs text-[#A16207]">次回更新: 2026/04/01</p>
+        </div>
+        <p className="text-lg font-bold text-[#92400E]">¥9,800</p>
+      </div>
     </div>
   );
 }
