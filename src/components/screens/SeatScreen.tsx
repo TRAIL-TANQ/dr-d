@@ -193,131 +193,160 @@ export default function SeatScreen({ liffProfile }: Props) {
         <h1 className="text-lg font-bold text-[#2D2D2D]">座席マップ</h1>
       </div>
 
-      {/* Zone summary */}
-      <div className="grid grid-cols-3 gap-2.5 mb-6">
-        {[
-          { z: "solo", label: "ひとり席", icon: "🪑", color: "#5B9BF5" },
-          { z: "free", label: "自由席", icon: "🪑", color: "#F97316" },
-          { z: "reading", label: "読書", icon: "📖", color: "#9B59B6" },
-        ].map(({ z, label, icon, color }) => {
-          const s = summary.find((x) => x.zone === z);
-          return (
-            <div key={z} className="bg-white border border-[#F0E6D6] rounded-xl p-3 text-center shadow-sm">
-              <p className="text-lg">{icon}</p>
-              <p className="text-xl font-bold" style={{ color }}>
-                {s?.available ?? 0}<span className="text-xs text-[#8C7B6B] font-normal">/{s?.total ?? 0}</span>
-              </p>
-              <p className="text-[10px] text-[#8C7B6B]">{label}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Solo seats ── */}
-      <SectionLabel text="🪑 ひとり席" sub="予約制・110分学習+10分片付け" />
-      <div className="grid grid-cols-5 gap-3 mb-2.5">
-        {soloSeats.slice(0, 5).map((s) => (
-          <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} size="md" />
-        ))}
-      </div>
-      <div className="grid grid-cols-5 gap-3 mb-3">
-        {soloSeats.slice(5, 10).map((s) => (
-          <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} size="md" />
-        ))}
-      </div>
-
-      {/* Time picker (when solo seat selected) */}
-      {selectedSeat && (
-        <div className="bg-white border border-[#5B9BF5]/30 rounded-xl p-4 mb-4 animate-fade-in">
-          <p className="text-sm font-semibold text-[#2D2D2D] mb-3">
-            {selectedSeat} の開始時間を選んでね
-          </p>
-          <div className="flex gap-3 mb-3">
-            {/* Hour */}
-            <div className="flex-1">
-              <p className="text-[10px] text-[#8C7B6B] mb-1">時</p>
-              <div className="flex flex-wrap gap-1.5">
-                {HOURS.map((h) => (
-                  <button
-                    key={h}
-                    onClick={() => setPickHour(h)}
-                    className="w-10 h-8 rounded-lg text-sm font-semibold transition-all"
-                    style={{
-                      backgroundColor: pickHour === h ? "#5B9BF5" : "#F5F0EB",
-                      color: pickHour === h ? "#FFF" : "#6B6B6B",
-                    }}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Minute */}
-            <div className="flex-1">
-              <p className="text-[10px] text-[#8C7B6B] mb-1">分</p>
-              <div className="flex flex-wrap gap-1.5">
-                {MINUTES.filter((_, i) => i % 3 === 0 || pickMin === MINUTES[i]).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setPickMin(m)}
-                    className="w-10 h-8 rounded-lg text-sm font-semibold transition-all"
-                    style={{
-                      backgroundColor: pickMin === m ? "#5B9BF5" : "#F5F0EB",
-                      color: pickMin === m ? "#FFF" : "#6B6B6B",
-                    }}
-                  >
-                    {String(m).padStart(2, "0")}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-[#8C7B6B] mb-3">
-            {String(pickHour).padStart(2, "0")}:{String(pickMin).padStart(2, "0")} 開始
-            → 学習終了 {fmtAddMin(pickHour, pickMin, 110)}
-            → 片付け {fmtAddMin(pickHour, pickMin, 120)}
-          </p>
-          {blockEndExceeds && (
-            <p className="text-xs text-[#E85D5D] mb-2">⚠ 22:00を超えるため予約できません</p>
-          )}
-          <button
-            onClick={handleReserve}
-            disabled={actionLoading || blockEndExceeds}
-            className="w-full bg-[#5B9BF5] hover:bg-[#4A8AE4] disabled:opacity-40 text-white font-bold py-3 rounded-xl transition-all text-sm"
-          >
-            {actionLoading ? "処理中..." : "予約する ✨"}
-          </button>
+      {/* ── Floor Map ── */}
+      <div className="bg-white border-2 border-[#E0D5C8] rounded-2xl p-4 mb-5 relative">
+        {/* Entrance */}
+        <div className="flex items-center justify-center gap-2 mb-4 pb-3 border-b-2 border-dashed border-[#E0D5C8]">
+          <span className="text-lg">🚪</span>
+          <span className="text-xs font-bold text-[#8C7B6B] tracking-widest">入口</span>
         </div>
-      )}
 
-      {/* ── Free seats ── */}
-      <SectionLabel text="🪑 自由席" sub="先着順・2時間" />
-      <div className="flex gap-5 justify-center mb-5">
-        {Array.from(freeTables.entries()).map(([table, tableSeats]) => (
-          <div key={table} className="flex flex-col gap-2.5 items-center">
-            <p className="text-xs text-[#8C7B6B] font-semibold">卓{table}</p>
-            {tableSeats.map((s) => (
+        {/* Zone summary */}
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {[
+            { z: "solo", label: "ひとり席", icon: "🪑", color: "#5B9BF5" },
+            { z: "free", label: "自由席", icon: "🪑", color: "#F97316" },
+            { z: "reading", label: "読書", icon: "📖", color: "#9B59B6" },
+          ].map(({ z, label, icon, color }) => {
+            const s = summary.find((x) => x.zone === z);
+            return (
+              <div key={z} className="bg-[#FAFAF7] border border-[#F0E6D6] rounded-xl p-2.5 text-center">
+                <p className="text-sm">{icon}</p>
+                <p className="text-lg font-bold" style={{ color }}>
+                  {s?.available ?? 0}<span className="text-[10px] text-[#8C7B6B] font-normal">/{s?.total ?? 0}</span>
+                </p>
+                <p className="text-[10px] text-[#8C7B6B]">{label}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Solo seats zone ── */}
+        <div className="bg-[#F5F8FF] border border-[#C8D9F0] rounded-xl p-3 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-sm font-bold text-[#2D2D2D]">🪑 ひとり席</h2>
+            <span className="text-[9px] bg-[#5B9BF5]/15 text-[#3A7CE8] px-2 py-0.5 rounded-full font-semibold">予約制・110分+片付10分</span>
+          </div>
+          {/* Row A */}
+          <div className="grid grid-cols-5 gap-2 mb-1.5">
+            {soloSeats.slice(0, 5).map((s) => (
+              <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} size="md" />
+            ))}
+          </div>
+          {/* Partition line */}
+          <div className="border-t border-dashed border-[#C8D9F0] my-1.5 mx-2" />
+          {/* Row B */}
+          <div className="grid grid-cols-5 gap-2">
+            {soloSeats.slice(5, 10).map((s) => (
+              <SeatButton key={s.id} seat={s} selected={selectedSeat === s.id} onTap={handleSeatTap} size="md" />
+            ))}
+          </div>
+        </div>
+
+        {/* Time picker (when solo seat selected) */}
+        {selectedSeat && (
+          <div className="bg-white border-2 border-[#5B9BF5]/40 rounded-xl p-4 mb-4 animate-fade-in -mt-2">
+            <p className="text-sm font-semibold text-[#2D2D2D] mb-3">
+              {selectedSeat} の開始時間を選んでね
+            </p>
+            <div className="flex gap-3 mb-3">
+              <div className="flex-1">
+                <p className="text-[10px] text-[#8C7B6B] mb-1">時</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {HOURS.map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => setPickHour(h)}
+                      className="w-10 h-9 rounded-lg text-sm font-semibold transition-all"
+                      style={{
+                        backgroundColor: pickHour === h ? "#5B9BF5" : "#F5F0EB",
+                        color: pickHour === h ? "#FFF" : "#6B6B6B",
+                      }}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] text-[#8C7B6B] mb-1">分</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {MINUTES.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setPickMin(m)}
+                      className="w-10 h-9 rounded-lg text-sm font-semibold transition-all"
+                      style={{
+                        backgroundColor: pickMin === m ? "#5B9BF5" : "#F5F0EB",
+                        color: pickMin === m ? "#FFF" : "#6B6B6B",
+                      }}
+                    >
+                      {String(m).padStart(2, "0")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-[#8C7B6B] mb-3">
+              {String(pickHour).padStart(2, "0")}:{String(pickMin).padStart(2, "0")} 開始
+              → 学習終了 {fmtAddMin(pickHour, pickMin, 110)}
+              → 片付け {fmtAddMin(pickHour, pickMin, 120)}
+            </p>
+            {blockEndExceeds && (
+              <p className="text-xs text-[#E85D5D] mb-2">⚠ 22:00を超えるため予約できません</p>
+            )}
+            <button
+              onClick={handleReserve}
+              disabled={actionLoading || blockEndExceeds}
+              className="w-full bg-[#5B9BF5] hover:bg-[#4A8AE4] disabled:opacity-40 text-white font-bold py-3 rounded-xl transition-all text-sm"
+            >
+              {actionLoading ? "処理中..." : "予約する ✨"}
+            </button>
+          </div>
+        )}
+
+        {/* ── Free seats zone ── */}
+        <div className="bg-[#FFF8F3] border border-[#F0D8C0] rounded-xl p-3 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-sm font-bold text-[#2D2D2D]">🪑 自由席</h2>
+            <span className="text-[9px] bg-[#F97316]/15 text-[#C85A10] px-2 py-0.5 rounded-full font-semibold">先着順・2h</span>
+          </div>
+          <div className="flex gap-4 justify-center">
+            {Array.from(freeTables.entries()).map(([table, tableSeats]) => (
+              <div key={table} className="flex flex-col items-center">
+                <p className="text-[10px] text-[#8C7B6B] font-bold mb-1.5">卓{table}</p>
+                {/* Table visual */}
+                <div className="bg-[#F5EDE5] border border-[#E0D5C8] rounded-xl p-2 flex flex-col gap-2">
+                  {tableSeats.map((s) => (
+                    <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} size="lg" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Reading zone ── */}
+        <div className="bg-[#FAF5FF] border border-[#DCC8F0] rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-sm font-bold text-[#2D2D2D]">📖 読書スペース</h2>
+            <span className="text-[9px] bg-[#9B59B6]/15 text-[#7B3FA0] px-2 py-0.5 rounded-full font-semibold">1日1回・30分</span>
+          </div>
+          <div className="flex gap-3 justify-center">
+            {readSeats.map((s) => (
               <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} size="lg" />
             ))}
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* ── Reading seats ── */}
-      <SectionLabel text="📖 読書スペース" sub="先着順・30分・1日1回" />
-      <div className="flex gap-3 justify-center mb-6">
-        {readSeats.map((s) => (
-          <SeatButton key={s.id} seat={s} selected={false} onTap={handleSeatTap} size="lg" />
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center text-[10px] text-[#8C7B6B]">
-        <span><span className="inline-block w-3 h-3 rounded border border-[#E0D5C8] bg-white mr-1 align-middle" />空き</span>
-        <span><span className="inline-block w-3 h-3 rounded bg-[#5B9BF5] mr-1 align-middle" />選択中</span>
-        <span><span className="inline-block w-3 h-3 rounded bg-[#FFB057] mr-1 align-middle" />予約(自分)</span>
-        <span><span className="inline-block w-3 h-3 rounded bg-[#5CC9A7] mr-1 align-middle" />利用中(自分)</span>
-        <span><span className="inline-block w-3 h-3 rounded bg-[#D0C8C0] mr-1 align-middle" />利用中</span>
+        {/* Legend */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center text-[10px] text-[#8C7B6B] pt-2 border-t border-[#F0E6D6]">
+          <span><span className="inline-block w-2.5 h-2.5 rounded border border-[#E0D5C8] bg-white mr-0.5 align-middle" />空き</span>
+          <span><span className="inline-block w-2.5 h-2.5 rounded bg-[#5B9BF5] mr-0.5 align-middle" />選択中</span>
+          <span><span className="inline-block w-2.5 h-2.5 rounded bg-[#FFB057] mr-0.5 align-middle" />予約</span>
+          <span><span className="inline-block w-2.5 h-2.5 rounded bg-[#5CC9A7] mr-0.5 align-middle" />利用中</span>
+          <span><span className="inline-block w-2.5 h-2.5 rounded bg-[#D0C8C0] mr-0.5 align-middle" />使用中</span>
+        </div>
       </div>
 
       {/* ── Confirm dialog (free/reading) ── */}
